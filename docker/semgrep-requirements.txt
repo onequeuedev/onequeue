@@ -696,7 +696,7 @@ pygments==2.21.0 \
     --hash=sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9 \
     --hash=sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c
     # via rich
-pyjwt==2.15.1 \
+pyjwt[crypto]==2.15.1 \
     --hash=sha256:42d59d631f7768a1028a64c7ff581a9bf7519804daf91fc5b6c56e30eec5e193 \
     --hash=sha256:4f259e80cdfb6b3fc18a7de51fd1ef9ec79652f25019bae68975ca2468a34df8
     # via
@@ -929,15 +929,21 @@ semantic-version==2.10.0 \
     --hash=sha256:bdabb6d336998cbb378d4b9db3a4b56a1e3235701dc05ea2690d9a997ed5041c \
     --hash=sha256:de78a3b8e0feda74cabc54aab2da702113e33ac9d9eb9d2389bcf1f58b7d9177
     # via semgrep
-semgrep==1.182.1 \
-    --hash=sha256:1db6d5becbb60d697a312fce6ec7e00cfde4eff1d221cce7ce85c49df55240eb \
-    --hash=sha256:1e18f12a091cb7258f879c5fea1b47a10768af212f1f78ee0c16c52e00be32b7 \
-    --hash=sha256:3fdfbd68ac5eeead60983dbcd539428bbc40d01f805e0569301068d06be7eaa3 \
-    --hash=sha256:89fe0afe240455800f806145f5679707892ea9bbd442a56eab1ea0b25a95f4c6 \
-    --hash=sha256:b072c59734384784a912b991c417b6c8e4771abdb3c39b9196fc01efdff8aa10 \
-    --hash=sha256:bba25e5a38db5061d725c0920699ecee3e8137026427e722a271bd9bb8d25a40 \
-    --hash=sha256:c38a3490fca93080e26e5f169e7e1fcb46742dd77e3d8e0fd9190653cb6c4ccd \
-    --hash=sha256:e464d398107d026aa6e9c938fab2efabdf2ff8a9c7a52d7abeed0c149e62b68c
+semgrep==1.184.0 \
+    --hash=sha256:0ce3064175a44236dd9fd35603627e3f56139ac61e13ca967bae2b76b2cec9bf \
+    --hash=sha256:0ce3064175a44236dd9fd35603627e3f56139ac61e13ca967bae2b76b2cec9bf \
+    --hash=sha256:0fc8a58e9a62de59ce644dde792dfc36764245d0139ab85632f66a8e0846a8c5 \
+    --hash=sha256:0fc8a58e9a62de59ce644dde792dfc36764245d0139ab85632f66a8e0846a8c5 \
+    --hash=sha256:3c86b2961b4663d1338fb965de038c7869571661971b78e18e9346ab57e1e20a \
+    --hash=sha256:3c86b2961b4663d1338fb965de038c7869571661971b78e18e9346ab57e1e20a \
+    --hash=sha256:42a59e95433fd05a0908f8083e25656c90994c65549e483e0de8a1a0004a7adf \
+    --hash=sha256:42a59e95433fd05a0908f8083e25656c90994c65549e483e0de8a1a0004a7adf \
+    --hash=sha256:cf82d77eb911f921902f3e9d098fb97604c5419c0a87cf7de7ab2944b05e2ceb \
+    --hash=sha256:cf82d77eb911f921902f3e9d098fb97604c5419c0a87cf7de7ab2944b05e2ceb \
+    --hash=sha256:d847abb8fb6fdde77d9e30a6bc869dbfcb68eff4142dcd77897c52635a7600d9 \
+    --hash=sha256:d847abb8fb6fdde77d9e30a6bc869dbfcb68eff4142dcd77897c52635a7600d9 \
+    --hash=sha256:f794d7c6d33126b6881f80d069583ef35b52bd796d882a5fa249ce1124aba3f3 \
+    --hash=sha256:f794d7c6d33126b6881f80d069583ef35b52bd796d882a5fa249ce1124aba3f3
     # via -r semgrep-requirements.in
 sse-starlette==3.7.0 \
     --hash=sha256:326416da2ab52e9a41b3f409d3ff897eda45aa68c9f3b7b17d0913aab8d219c3 \
@@ -949,6 +955,12 @@ starlette==1.10.0 \
     # via
     #   mcp
     #   sse-starlette
+structlog==26.1.0 \
+    --hash=sha256:e081a26d6c373e6d201eca24eede26d8ffab07f88f477822e679183428d3d91e \
+    --hash=sha256:e081a26d6c373e6d201eca24eede26d8ffab07f88f477822e679183428d3d91e \
+    --hash=sha256:f63a716cbd1b1291cf7661de7794b455acfa4c43c5bcf1630e6ad5ddc1adb3b7 \
+    --hash=sha256:f63a716cbd1b1291cf7661de7794b455acfa4c43c5bcf1630e6ad5ddc1adb3b7
+    # via semgrep
 tomli==2.4.1 \
     --hash=sha256:01f520d4f53ef97964a240a035ec2a869fe1a37dde002b57ebc4417a27ccd853 \
     --hash=sha256:0d85819802132122da43cb86656f8d1f8c6587d54ae7dcaf30e90533028b49fe \
@@ -1002,7 +1014,6 @@ typing-extensions==4.16.0 \
     --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8 \
     --hash=sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5
     # via
-    #   anyio
     #   mcp
     #   opentelemetry-api
     #   opentelemetry-exporter-otlp-proto-http
@@ -1011,9 +1022,7 @@ typing-extensions==4.16.0 \
     #   pydantic
     #   pydantic-core
     #   pydantic-settings
-    #   referencing
     #   semgrep
-    #   starlette
     #   typing-inspection
 typing-inspection==0.4.5 \
     --hash=sha256:7f16c411e7930dc79596d42ab44672a3fe5f60eb34b781a1647e7872363120c7 \
