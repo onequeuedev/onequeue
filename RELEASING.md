@@ -16,7 +16,7 @@
 1. **Build and push the image.** Run the *Release image* workflow
    (`.github/workflows/release.yml`) from `main` with the version, for example
    `1.2.0`. It runs the tests, builds `linux/amd64` and `linux/arm64`, pushes
-   `docker.io/rhysha/onequeuedev:1.2.0` with SBOM and provenance, records a
+   `docker.io/rhysha/onequeuedev:1.2.0` (also tagged `v1.2.0`) with SBOM and provenance, records a
    GitHub build attestation, and prints the digest in the job summary.
 2. **Pin the digest and tag.** Set `runs.image` in `action.yml` to
    `docker://docker.io/rhysha/onequeuedev@sha256:<digest>`.

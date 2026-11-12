@@ -73,8 +73,10 @@ jobs:
           provenance: mode=max
           sbom: true
           build-args: ACTION_VERSION=${{ inputs.version }}
+          # Same image under both spellings, to match the git tag vX.Y.Z.
           tags: |
             ${{ env.IMAGE }}:${{ inputs.version }}
+            ${{ env.IMAGE }}:v${{ inputs.version }}
           labels: |
             org.opencontainers.image.version=${{ inputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
