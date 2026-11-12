@@ -75,5 +75,5 @@ outputs:
 runs:
   using: docker
   # Pinned by digest. Updated on each release from the release workflow summary.
-  # 1.0.0
-  image: docker://docker.io/rhysha/onequeuedev@sha256:52e0d5837ef4b58a3515c9c3e1b6072fd93c6c30c367b7cc56fc7c5212f3cb25
+  # 1.0.1
+  image: docker://docker.io/rhysha/onequeuedev@sha256:c0c40c910dcbb35de1835ae9edde364da4fa351830a0a002d81b125300a799a8
