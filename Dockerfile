@@ -10,7 +10,7 @@
 # ---------------------------------------------------------------------------
 # 1. Build the TypeScript bundle (single file, no node_modules at runtime)
 # ---------------------------------------------------------------------------
-FROM node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS build
+FROM node:25-bookworm-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS build
 WORKDIR /src
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
