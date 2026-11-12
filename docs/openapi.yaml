@@ -124,7 +124,14 @@ paths:
         '403':
           $ref: '#/components/responses/Error'
         '404':
-          $ref: '#/components/responses/Error'
+          description: >-
+            The verdict does not exist yet. This is normal shortly after an
+            upload; the client treats it as pending and keeps polling until
+            its gate-timeout.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/Error'
         5XX:

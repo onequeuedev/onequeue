@@ -185,8 +185,23 @@ describe('pollVerdict', () => {
     expect(await c.pollVerdict('upl_test123', 30_000)).toMatchObject({ kind: 'verdict' });
   });
 
-  it('stops on 404', async () => {
-    const { c } = await client({ upload: [], verdict: [{ status: 404, body: { error: { code: 'not_found', message: 'no' } } }] });
+  it('treats 404 shortly after upload as pending, then returns the verdict', async () => {
+    const nf = { status: 404, body: { error: { code: 'not_found', message: 'no' } } };
+    const { c, clock } = await client({ upload: [], verdict: [nf, nf, { status: 200, body: { status: 'pass' } }] });
+    expect(await c.pollVerdict('upl_test123', 30_000)).toMatchObject({ kind: 'verdict', verdict: { status: 'pass' } });
+    expect(server!.requests).toHaveLength(3);
+    expect(clock.sleeps).toEqual([2000, 2000]);
+  });
+
+  it('keeps treating 404 as pending until gate-timeout, then times out', async () => {
+    const { c, clock } = await client({ upload: [], verdict: [{ status: 404, body: { error: { code: 'not_found', message: 'no' } } }] });
+    expect(await c.pollVerdict('upl_test123', 10_000)).toEqual({ kind: 'timeout' });
+    expect(clock.sleeps.reduce((a, b) => a + b, 0)).toBe(10_000);
+    expect(server!.requests).toHaveLength(5);
+  });
+
+  it.each([400, 401, 403, 410])('stops on other 4xx (%i)', async (status) => {
+    const { c } = await client({ upload: [], verdict: [{ status, body: { error: { code: 'nope', message: 'no' } } }] });
     expect(await c.pollVerdict('upl_test123', 30_000)).toMatchObject({ kind: 'error' });
     expect(server!.requests).toHaveLength(1);
   });

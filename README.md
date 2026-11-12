@@ -113,6 +113,8 @@ requests is in [`examples/onequeue.yml`](examples/onequeue.yml).
    seconds, for up to `gate-timeout` seconds:
    - verdict `fail`: the step fails and prints the server's reason;
    - verdict `pass`: the step passes;
+   - `404` (the verdict does not exist yet, which is normal right after an
+     upload): treated as pending, polling continues until `gate-timeout`;
    - no verdict in time, upload failed, or verdict unavailable: `on-timeout`
      decides.
 

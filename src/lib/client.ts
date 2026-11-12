@@ -229,8 +229,10 @@ export class OneQueueClient {
 
   /**
    * Poll the verdict every `intervalMs` until pass/fail or `timeoutMs` elapses.
-   * Transient errors (network, 5xx, 429) are retried until the deadline;
-   * other 4xx responses stop polling.
+   * Transient errors (network, 5xx, 429) are retried until the deadline.
+   * 404 is treated as "pending": right after an upload the verdict resource
+   * may not exist yet, so it is polled until the deadline like any pending
+   * verdict. Other 4xx responses stop polling.
    */
   async pollVerdict(id: string, timeoutMs: number, intervalMs = 2000): Promise<PollResult> {
     const deadline = this.now() + timeoutMs;
@@ -242,11 +244,15 @@ export class OneQueueClient {
         if (v.status === 'pass' || v.status === 'fail') return { kind: 'verdict', verdict: v as Verdict & { status: 'pass' | 'fail' } };
       } catch (e) {
         const status = e instanceof ApiError ? e.status : undefined;
-        if (status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429) {
-          return { kind: 'error', message: (e as Error).message };
+        if (status === 404) {
+          this.debug('verdict not available yet (HTTP 404), treating as pending');
+        } else {
+          if (status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429) {
+            return { kind: 'error', message: (e as Error).message };
+          }
+          if (e instanceof ApiError && e.code === 'invalid_response') return { kind: 'error', message: e.message };
+          this.debug(`verdict poll failed: ${(e as Error).message}`);
         }
-        if (e instanceof ApiError && e.code === 'invalid_response') return { kind: 'error', message: e.message };
-        this.debug(`verdict poll failed: ${(e as Error).message}`);
       }
       const wait = Math.min(intervalMs, deadline - this.now());
       if (wait <= 0) return { kind: 'timeout' };

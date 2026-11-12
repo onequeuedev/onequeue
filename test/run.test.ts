@@ -290,6 +290,20 @@ describe('gate mode', () => {
     expect(uploads()[0]!.json.mode).toBe('gate');
   });
 
+  it('verdict 404 right after upload is pending, then pass -> exit 0', async () => {
+    const nf = { status: 404, body: { error: { code: 'not_found', message: 'Not found' } } };
+    const scenario = { upload: SCENARIOS.pass.upload, verdict: [nf, nf, { status: 200, body: { id: 'upl_test123', status: 'pass' } }] };
+    expect(await go({ scenario, inputs: gate() })).toBe(0);
+    expect(server!.requests.filter((r) => r.method === 'GET')).toHaveLength(3);
+    expect(outputs()).toContain('verdict=pass');
+  });
+
+  it('verdict 404 until gate-timeout follows on-timeout (fail) -> exit 1', async () => {
+    const scenario = { upload: SCENARIOS.pass.upload, verdict: [{ status: 404, body: { error: { code: 'not_found', message: 'Not found' } } }] };
+    expect(await go({ scenario, inputs: gate({ 'on-timeout': 'fail' }) })).toBe(1);
+    expect(out()).toMatch(/no verdict before gate-timeout/);
+  });
+
   it('timeout + on-timeout=pass -> exit 0 with warning', async () => {
     expect(await go({ scenario: SCENARIOS.timeout, inputs: gate({ 'gate-timeout': '6' }) })).toBe(0);
     expect(out()).toMatch(/::warning::OneQueue gate passed without a server verdict: no verdict before gate-timeout/);
