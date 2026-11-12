@@ -265,7 +265,7 @@ describe('gate mode', () => {
 
   it('verdict fail -> exit 1 with a clear message', async () => {
     expect(await go({ scenario: SCENARIOS.fail, inputs: gate() })).toBe(1);
-    expect(out()).toMatch(/::error::OneQueue gate failed: 2 critical findings exceed fail-on=critical \(https:\/\/app\.keytrionlabs\.com/);
+    expect(out()).toMatch(/::error::OneQueue gate failed: 2 critical findings exceed fail-on=critical \(https:\/\/app\.onequeue\.dev/);
   });
 
   it('sends fail-on to the server', async () => {

@@ -4,8 +4,6 @@ info:
   version: 1.0.0
   summary: The endpoints used by OneQueue Scan (onequeuedev/onequeue).
   description: |
-    OneQueue by Keytrion Labs.
-
     This document describes only the client-facing contract used by the
     GitHub Action: uploading redacted findings and reading the gate verdict.
     Scoring, de-duplication and policy evaluation happen on the server and
@@ -21,10 +19,10 @@ info:
     **Redirects** are never followed by the client, so the `Authorization`
     header is never sent to another location.
   contact:
-    name: Keytrion Labs
-    email: security@keytrionlabs.com
+    name: OneQueue
+    email: security@onequeue.dev
 servers:
-  - url: https://api.keytrionlabs.com
+  - url: https://api.onequeue.dev
 security:
   - bearerAuth: []
 

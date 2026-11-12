@@ -1,10 +1,10 @@
 # Security policy
 
-OneQueue Scan is part of OneQueue by Keytrion Labs.
+OneQueue Scan is the GitHub Action for OneQueue.
 
 ## Reporting a vulnerability
 
-Email **security@keytrionlabs.com**. Please do not open a public GitHub issue
+Email **security@onequeue.dev**. Please do not open a public GitHub issue
 for security problems.
 
 Include, where you can:

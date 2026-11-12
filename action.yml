@@ -1,6 +1,6 @@
 name: OneQueue Scan
-description: OneQueue by Keytrion Labs. Runs Trivy, Semgrep and Gitleaks in your pipeline and uploads only redacted findings.
-author: Keytrion Labs
+description: Runs Trivy, Semgrep and Gitleaks in your pipeline and uploads only redacted findings.
+author: OneQueue
 branding:
   icon: shield
   color: blue
@@ -15,7 +15,7 @@ inputs:
   api-url:
     description: OneQueue API base URL. Must be https:// (http:// is allowed only for localhost).
     required: false
-    default: https://api.keytrionlabs.com
+    default: https://api.onequeue.dev
   scanners:
     description: Comma-separated scanners to run. Any of trivy, semgrep, gitleaks.
     required: false

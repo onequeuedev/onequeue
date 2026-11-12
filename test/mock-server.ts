@@ -67,7 +67,7 @@ export const SCENARIOS: Record<ScenarioName, MockConfig> = {
           id: 'upl_test123',
           status: 'fail',
           reason: '2 critical findings exceed fail-on=critical',
-          detailsUrl: 'https://app.keytrionlabs.com/uploads/upl_test123',
+          detailsUrl: 'https://app.onequeue.dev/uploads/upl_test123',
         },
       },
     ],

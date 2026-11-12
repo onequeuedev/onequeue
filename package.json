@@ -2,7 +2,7 @@
   "name": "onequeue-action",
   "version": "1.0.0",
   "private": true,
-  "description": "OneQueue Scan: GitHub Action for OneQueue by Keytrion Labs",
+  "description": "OneQueue Scan: GitHub Action for OneQueue",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "engines": {

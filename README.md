@@ -1,6 +1,6 @@
 # OneQueue Scan
 
-**OneQueue by Keytrion Labs.** A GitHub Action that runs Trivy, Semgrep and
+A GitHub Action that runs Trivy, Semgrep and
 Gitleaks inside your own pipeline and uploads only **redacted findings** to
 OneQueue.
 
@@ -74,7 +74,7 @@ still runs Gitleaks locally (see [Forked pull requests](#forked-pull-requests)).
 | Input | Default | Description |
 | --- | --- | --- |
 | `api-key` | (required) | OneQueue API key. Use the secret `ONEQUEUE_API_KEY`. Masked with `::add-mask::` and never logged. |
-| `api-url` | `https://api.keytrionlabs.com` | API base URL. Must be `https://`; `http://` is allowed only for `localhost`. |
+| `api-url` | `https://api.onequeue.dev` | API base URL. Must be `https://`; `http://` is allowed only for `localhost`. |
 | `scanners` | `trivy,semgrep,gitleaks` | Comma-separated list. Only these scanners run. |
 | `mode` | `upload` | `upload` or `gate`. |
 | `fail-on` | `critical` | Gate mode: `critical`, `high` or `none`. Sent to the server, which computes the verdict. |
@@ -337,7 +337,7 @@ with no GitHub Actions dependencies, so it can be reused by a CLI later.
 
 ## Security
 
-To report a vulnerability, email security@keytrionlabs.com. See
+To report a vulnerability, email security@onequeue.dev. See
 [SECURITY.md](SECURITY.md).
 
 ## License

@@ -1,10 +1,9 @@
 TODO(legal review): placeholder license text. Do not publish a release until
-Keytrion Labs legal has reviewed and replaced or approved this file.
+legal counsel has reviewed and replaced or approved this file.
 
 OneQueue Scan (onequeuedev/onequeue)
-OneQueue by Keytrion Labs
 
-Copyright (c) 2026 Keytrion Labs. All rights reserved.
+Copyright (c) 2026 OneQueue. All rights reserved.
 
 Permission to use this action in GitHub workflows is granted to holders of a
 valid OneQueue account.

@@ -25,7 +25,7 @@ export interface ParsedInputs {
   fatal?: string;
 }
 
-export const DEFAULT_API_URL = 'https://api.keytrionlabs.com';
+export const DEFAULT_API_URL = 'https://api.onequeue.dev';
 
 /** Docker actions receive inputs as INPUT_<NAME> with the hyphen kept. */
 export function getInput(env: NodeJS.ProcessEnv, name: string): string {

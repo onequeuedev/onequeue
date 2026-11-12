@@ -11,7 +11,7 @@ describe('parseInputs', () => {
     expect(problems).toEqual([]);
     expect(inputs).toEqual({
       apiKey: 'k',
-      apiUrl: 'https://api.keytrionlabs.com',
+      apiUrl: 'https://api.onequeue.dev',
       scanners: ['trivy', 'semgrep', 'gitleaks'],
       mode: 'upload',
       failOn: 'critical',
@@ -27,7 +27,7 @@ describe('parseInputs', () => {
     const { inputs, problems } = parseInputs(
       env({
         'api-key': 'k',
-        'api-url': 'https://eu.api.keytrionlabs.com',
+        'api-url': 'https://eu.api.onequeue.dev',
         scanners: 'Gitleaks, trivy,gitleaks',
         mode: 'GATE',
         'fail-on': 'high',
@@ -39,7 +39,7 @@ describe('parseInputs', () => {
     );
     expect(problems).toEqual([]);
     expect(inputs).toMatchObject({
-      apiUrl: 'https://eu.api.keytrionlabs.com',
+      apiUrl: 'https://eu.api.onequeue.dev',
       scanners: ['gitleaks', 'trivy'],
       mode: 'gate',
       failOn: 'high',
@@ -59,7 +59,7 @@ describe('parseInputs', () => {
     ['gitleaks-history', 'yes'],
     ['scanners', 'snyk'],
     ['semgrep-config', '--dangerous'],
-    ['api-url', 'http://api.keytrionlabs.com'],
+    ['api-url', 'http://api.onequeue.dev'],
   ])('reports a problem for %s=%s', (name, value) => {
     expect(parseInputs(env({ [name]: value })).problems.length).toBeGreaterThanOrEqual(1);
   });

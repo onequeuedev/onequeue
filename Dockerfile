@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 #
-# OneQueue Scan by Keytrion Labs.
+# OneQueue Scan.
 # Every base image is pinned by digest, every downloaded binary is checksum-verified,
 # and Semgrep is installed from a hash-locked requirements file.
 # To update a scanner, change its version and the matching SHA256 values below.
@@ -59,10 +59,10 @@ ARG SEMGREP_VERSION=1.182.1
 ARG ACTION_VERSION=dev
 
 LABEL org.opencontainers.image.title="OneQueue Scan" \
-      org.opencontainers.image.description="OneQueue by Keytrion Labs: runs Trivy, Semgrep and Gitleaks in your pipeline and uploads only redacted findings." \
-      org.opencontainers.image.vendor="Keytrion Labs" \
+      org.opencontainers.image.description="OneQueue: runs Trivy, Semgrep and Gitleaks in your pipeline and uploads only redacted findings." \
+      org.opencontainers.image.vendor="OneQueue" \
       org.opencontainers.image.source="https://github.com/onequeuedev/onequeue" \
-      org.opencontainers.image.licenses="LicenseRef-Keytrion-Proprietary"
+      org.opencontainers.image.licenses="LicenseRef-OneQueue-Proprietary"
 
 # git is needed only for gitleaks-history mode.
 RUN apt-get update \
