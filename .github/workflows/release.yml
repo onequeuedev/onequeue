@@ -4,8 +4,7 @@ name: Release image
 # and prints the digest to pin in action.yml. See RELEASING.md.
 #
 # Needs, in the repository settings (Secrets and variables -> Actions):
-#   variable DOCKERHUB_USERNAME  Docker Hub user allowed to push to rhysha/onequeuedev (rhysha)
-#   secret   DOCKERHUB_TOKEN     a Docker Hub access token with Read & Write scope
+#   secret DOCKERHUB_TOKEN  a Docker Hub access token (Read & Write) for the user rhysha
 
 on:
   workflow_dispatch:
@@ -61,7 +60,7 @@ jobs:
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: docker.io
-          username: ${{ vars.DOCKERHUB_USERNAME }}
+          username: rhysha # Docker Hub user; not a secret
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push

@@ -7,9 +7,9 @@
 1. In the Docker Hub account `rhysha`, create the **public** repository
    `onequeuedev`, so customer runners can pull without credentials.
 2. Create a Docker Hub access token with *Read & Write* scope for `rhysha`.
-3. In this GitHub repository, go to Settings -> Secrets and variables -> Actions:
-   - add the **variable** `DOCKERHUB_USERNAME` = `rhysha`;
-   - add the **secret** `DOCKERHUB_TOKEN` (the access token).
+3. In this GitHub repository, go to Settings -> Secrets and variables -> Actions
+   -> Secrets -> New repository secret, and add `DOCKERHUB_TOKEN` (the access
+   token). The Docker Hub user name `rhysha` is set in the workflow itself.
 
 ## Each release
 
