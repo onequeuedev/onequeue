@@ -61,6 +61,9 @@ still runs Gitleaks locally (see [Forked pull requests](#forked-pull-requests)).
           on-timeout: pass     # pass (warn only, default) or fail
 ```
 
+A complete, commented workflow that uploads on pushes to `main` and gates pull
+requests is in [`examples/onequeue.yml`](examples/onequeue.yml).
+
 ## Requirements
 
 - Linux runners only (`ubuntu-*` or self-hosted Linux with Docker). This is a
@@ -311,7 +314,7 @@ The full API contract is in [docs/openapi.yaml](docs/openapi.yaml).
 - The image is pinned by digest in [action.yml](action.yml) and built by
   [.github/workflows/release.yml](.github/workflows/release.yml), with SBOM
   and build provenance attestations. You can verify it with
-  `gh attestation verify oci://ghcr.io/onequeuedev/onequeue@<digest> --owner onequeuedev`.
+  `gh attestation verify oci://index.docker.io/rhysha/onequeuedev@<digest> --owner onequeuedev`.
 - Base images are pinned by digest. Trivy and Gitleaks release tarballs are
   checked against pinned SHA256 values. Semgrep is installed from a
   hash-locked requirements file (`pip --require-hashes --only-binary=:all:`).

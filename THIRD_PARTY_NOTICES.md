@@ -2,7 +2,7 @@
 
 > TODO(legal review): confirm the obligations below before the first release.
 
-The OneQueue Scan container image (`ghcr.io/onequeuedev/onequeue`)
+The OneQueue Scan container image (`docker.io/rhysha/onequeuedev`)
 redistributes the following third-party software. Each component is licensed
 under its own terms, which are not changed by the OneQueue license in
 [LICENSE](LICENSE). License texts are included in the image under

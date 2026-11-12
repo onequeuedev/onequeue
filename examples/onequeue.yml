@@ -1,0 +1,59 @@
+# Example workflow for a repository that uses OneQueue Scan.
+#
+# Copy this file to .github/workflows/onequeue.yml in YOUR repository, then:
+#   1. Add the secret ONEQUEUE_API_KEY (Settings -> Secrets and variables -> Actions).
+#   2. Replace <full-commit-sha> with the 40-character commit SHA of the
+#      onequeuedev/onequeue release you want to use.
+#
+# Pushes to main upload findings (never fails the build).
+# Pull requests are gated: the check fails on findings at or above `fail-on`,
+# and on any secret found by Gitleaks.
+#
+# Do not switch this to `pull_request_target`: it would run untrusted fork
+# code with access to your secrets. With `pull_request`, fork PRs get an empty
+# api-key; the action then skips the upload and runs Gitleaks locally only.
+
+name: OneQueue Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: onequeue-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest # Linux only: OneQueue Scan is a Docker container action
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # fetch-depth: 0       # only needed with gitleaks-history: true
+
+      - name: OneQueue Scan
+        id: onequeue
+        uses: onequeuedev/onequeue@<full-commit-sha> # v1.0.0
+        with:
+          api-key: ${{ secrets.ONEQUEUE_API_KEY }}
+          mode: ${{ github.event_name == 'pull_request' && 'gate' || 'upload' }}
+          fail-on: high # critical | high | none
+          gate-timeout: 60 # seconds to wait for the server verdict
+          on-timeout: pass # pass | fail when no verdict arrives in time
+          # scanners: trivy,semgrep,gitleaks
+          # semgrep-config: p/default
+          # gitleaks-history: false
+
+      - name: Show result
+        if: always()
+        env:
+          UPLOAD_ID: ${{ steps.onequeue.outputs.upload-id }}
+          FINDINGS: ${{ steps.onequeue.outputs.findings }}
+          VERDICT: ${{ steps.onequeue.outputs.verdict }}
+        run: echo "upload=$UPLOAD_ID findings=$FINDINGS verdict=$VERDICT"

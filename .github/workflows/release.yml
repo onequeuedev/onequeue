@@ -1,7 +1,11 @@
 name: Release image
 
-# Builds the container image, pushes it to ghcr.io/onequeuedev/onequeue
+# Builds the container image, pushes it to Docker Hub (docker.io/rhysha/onequeuedev)
 # and prints the digest to pin in action.yml. See RELEASING.md.
+#
+# Needs, in the repository settings (Secrets and variables -> Actions):
+#   variable DOCKERHUB_USERNAME  Docker Hub user allowed to push to rhysha/onequeuedev (rhysha)
+#   secret   DOCKERHUB_TOKEN     a Docker Hub access token with Read & Write scope
 
 on:
   workflow_dispatch:
@@ -23,11 +27,12 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      packages: write
       id-token: write
       attestations: write
     env:
-      IMAGE: ghcr.io/onequeuedev/onequeue
+      IMAGE: docker.io/rhysha/onequeuedev
+      # Docker Hub images are attested under index.docker.io.
+      ATTEST_SUBJECT: index.docker.io/rhysha/onequeuedev
     steps:
       - name: Validate version
         env:
@@ -55,9 +60,9 @@ jobs:
 
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: docker.io
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push
         id: build
@@ -78,9 +83,11 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-name: ${{ env.IMAGE }}
+          subject-name: ${{ env.ATTEST_SUBJECT }}
           subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
+          # The attestation is stored by GitHub; verify it with
+          # gh attestation verify oci://index.docker.io/rhysha/onequeuedev@<digest> --owner onequeuedev
+          push-to-registry: false
 
       - name: Print digest
         env:

@@ -2,19 +2,30 @@
 
 `action.yml` references the image by digest, so a release has two steps.
 
+## One-time setup (Docker Hub)
+
+1. In the Docker Hub account `rhysha`, create the **public** repository
+   `onequeuedev`, so customer runners can pull without credentials.
+2. Create a Docker Hub access token with *Read & Write* scope for `rhysha`.
+3. In this GitHub repository, go to Settings -> Secrets and variables -> Actions:
+   - add the **variable** `DOCKERHUB_USERNAME` = `rhysha`;
+   - add the **secret** `DOCKERHUB_TOKEN` (the access token).
+
+## Each release
+
 1. **Build and push the image.** Run the *Release image* workflow
    (`.github/workflows/release.yml`) from `main` with the version, for example
    `1.2.0`. It runs the tests, builds `linux/amd64` and `linux/arm64`, pushes
-   `ghcr.io/onequeuedev/onequeue:1.2.0` with SBOM and provenance
-   attestations, and prints the digest in the job summary.
-2. **Pin the digest and tag.** Open a PR that sets
-   `runs.image` in `action.yml` to
-   `docker://ghcr.io/onequeuedev/onequeue@sha256:<digest>`.
-   After it merges, tag that commit `v1.2.0` and create a GitHub release.
+   `docker.io/rhysha/onequeuedev:1.2.0` with SBOM and provenance, records a
+   GitHub build attestation, and prints the digest in the job summary.
+2. **Pin the digest and tag.** Set `runs.image` in `action.yml` to
+   `docker://docker.io/rhysha/onequeuedev@sha256:<digest>`.
+   After it is on `main`, tag that commit `v1.2.0` and create a GitHub release.
    Customers pin the commit SHA of that tag.
 
-The ghcr.io package must be public so that customer runners can pull it
-without credentials.
+Note: Docker Hub rate-limits anonymous pulls per IP address. Customers on
+self-hosted runners that pull often may need to log in to Docker Hub on the
+runner, or use a pull-through cache.
 
 ## Updating scanners
 
