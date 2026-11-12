@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: OneQueue Upload API
   version: 1.0.0
-  summary: The endpoints used by OneQueue Scan (keytrionlabs/onequeue-action).
+  summary: The endpoints used by OneQueue Scan (onequeuedev/onequeue).
   description: |
     OneQueue by Keytrion Labs.
 

@@ -35,7 +35,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: keytrionlabs/onequeue-action@<full-commit-sha> # v1.0.0
+      - uses: onequeuedev/onequeue@<full-commit-sha> # v1.0.0
         with:
           api-key: ${{ secrets.ONEQUEUE_API_KEY }}
 ```
@@ -52,7 +52,7 @@ still runs Gitleaks locally (see [Forked pull requests](#forked-pull-requests)).
 ### Gate mode
 
 ```yaml
-      - uses: keytrionlabs/onequeue-action@<full-commit-sha> # v1.0.0
+      - uses: onequeuedev/onequeue@<full-commit-sha> # v1.0.0
         with:
           api-key: ${{ secrets.ONEQUEUE_API_KEY }}
           mode: gate
@@ -311,7 +311,7 @@ The full API contract is in [docs/openapi.yaml](docs/openapi.yaml).
 - The image is pinned by digest in [action.yml](action.yml) and built by
   [.github/workflows/release.yml](.github/workflows/release.yml), with SBOM
   and build provenance attestations. You can verify it with
-  `gh attestation verify oci://ghcr.io/keytrionlabs/onequeue-action@<digest> --owner keytrionlabs`.
+  `gh attestation verify oci://ghcr.io/onequeuedev/onequeue@<digest> --owner onequeuedev`.
 - Base images are pinned by digest. Trivy and Gitleaks release tarballs are
   checked against pinned SHA256 values. Semgrep is installed from a
   hash-locked requirements file (`pip --require-hashes --only-binary=:all:`).

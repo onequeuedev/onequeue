@@ -5,11 +5,11 @@
 1. **Build and push the image.** Run the *Release image* workflow
    (`.github/workflows/release.yml`) from `main` with the version, for example
    `1.2.0`. It runs the tests, builds `linux/amd64` and `linux/arm64`, pushes
-   `ghcr.io/keytrionlabs/onequeue-action:1.2.0` with SBOM and provenance
+   `ghcr.io/onequeuedev/onequeue:1.2.0` with SBOM and provenance
    attestations, and prints the digest in the job summary.
 2. **Pin the digest and tag.** Open a PR that sets
    `runs.image` in `action.yml` to
-   `docker://ghcr.io/keytrionlabs/onequeue-action@sha256:<digest>`.
+   `docker://ghcr.io/onequeuedev/onequeue@sha256:<digest>`.
    After it merges, tag that commit `v1.2.0` and create a GitHub release.
    Customers pin the commit SHA of that tag.
 

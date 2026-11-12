@@ -1,6 +1,6 @@
 name: Release image
 
-# Builds the container image, pushes it to ghcr.io/keytrionlabs/onequeue-action
+# Builds the container image, pushes it to ghcr.io/onequeuedev/onequeue
 # and prints the digest to pin in action.yml. See RELEASING.md.
 
 on:
@@ -27,7 +27,7 @@ jobs:
       id-token: write
       attestations: write
     env:
-      IMAGE: ghcr.io/keytrionlabs/onequeue-action
+      IMAGE: ghcr.io/onequeuedev/onequeue
     steps:
       - name: Validate version
         env:

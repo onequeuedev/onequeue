@@ -23,7 +23,7 @@ the issue before disclosing it publicly.
   snippets, secret values, environment variables, commit author data).
 - Leaks of the OneQueue API key (logs, redirects, outputs).
 - Supply-chain issues in this repository, its workflows or the published
-  image `ghcr.io/keytrionlabs/onequeue-action`.
+  image `ghcr.io/onequeuedev/onequeue`.
 
 Vulnerabilities in Trivy, Semgrep or Gitleaks themselves should be reported
 to those projects. If one affects this action, please tell us as well.
