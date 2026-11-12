@@ -1,8 +1,11 @@
 /**
  * OneQueue API client. See docs/openapi.yaml for the contract.
  *
- * - POST {apiUrl}/v1/uploads: gzip JSON, Bearer auth, Idempotency-Key that is
- *   identical across retries so a retried request cannot create a duplicate.
+ * - POST {apiUrl}/v1/uploads: raw gzip bytes of the JSON envelope, sent as
+ *   Content-Type: application/gzip (no Content-Encoding header; the API rejects
+ *   text content types with 400 invalid_encoding), Bearer auth, and an
+ *   Idempotency-Key that is identical across retries so a retried request
+ *   cannot create a duplicate.
  * - GET  {apiUrl}/v1/uploads/{id}/verdict: polled until pass/fail or deadline.
  * Redirects are never followed, so the Authorization header is never forwarded.
  */
@@ -141,9 +144,14 @@ export class OneQueueClient {
     return this.backoffMs * 2 ** attempt + Math.floor(this.random() * 250);
   }
 
+  /** The exact JSON text that is gzipped and uploaded. Also used by dry-run. */
+  static serialize(envelope: unknown): string {
+    return JSON.stringify(envelope);
+  }
+
   /** Serialize + gzip the envelope. Exposed for tests. */
   static encode(envelope: unknown): Buffer {
-    return gzipSync(Buffer.from(JSON.stringify(envelope), 'utf8'));
+    return gzipSync(Buffer.from(OneQueueClient.serialize(envelope), 'utf8'));
   }
 
   async upload(envelope: unknown, idempotencyKey: string = randomUUID()): Promise<UploadResult> {
@@ -156,8 +164,7 @@ export class OneQueueClient {
         res = await this.fetch(`${this.base}/v1/uploads`, {
           method: 'POST',
           headers: this.headers({
-            'Content-Type': 'application/json',
-            'Content-Encoding': 'gzip',
+            'Content-Type': 'application/gzip',
             'Idempotency-Key': idempotencyKey,
           }),
           body,

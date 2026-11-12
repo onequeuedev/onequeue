@@ -33,19 +33,19 @@ paths:
       summary: Upload redacted findings
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
-        - name: Content-Encoding
-          in: header
-          required: true
-          description: The body is always gzip-compressed JSON.
-          schema:
-            type: string
-            const: gzip
       requestBody:
         required: true
+        description: |
+          Raw gzip bytes (starting with the magic bytes `1f 8b`) of a UTF-8
+          JSON document matching `#/components/schemas/UploadEnvelope`.
+          The client sends `Content-Type: application/gzip` and no
+          `Content-Encoding` header. Text content types such as
+          `application/json` are rejected with `400 invalid_encoding`.
         content:
-          application/json:
+          application/gzip:
             schema:
-              $ref: '#/components/schemas/UploadEnvelope'
+              type: string
+              format: binary
       responses:
         '202':
           description: Upload accepted for processing.
@@ -60,7 +60,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/UploadAccepted'
         '400':
-          $ref: '#/components/responses/Error'
+          description: >-
+            Invalid request. `invalid_encoding` when the Content-Type is not
+            application/gzip or the body is not gzip.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Error'
         '403':
@@ -196,7 +202,7 @@ components:
               type: string
               maxLength: 64
               description: Stable machine-readable code.
-              examples: [unauthorized, invalid_payload, idempotency_conflict, rate_limited, internal_error]
+              examples: [unauthorized, invalid_encoding, invalid_payload, idempotency_conflict, rate_limited, internal_error]
             message:
               type: string
               description: Human-readable message. Must not contain secrets; the client prints it.

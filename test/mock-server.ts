@@ -35,6 +35,8 @@ export interface RecordedRequest {
   method: string;
   path: string;
   headers: IncomingMessage['headers'];
+  /** Raw request body bytes, exactly as received. */
+  raw: Buffer;
   /** Decoded (gunzipped) body text. */
   body: string;
   /** Parsed JSON body, if any. */
@@ -82,6 +84,24 @@ export interface MockServer {
   close(): Promise<void>;
 }
 
+export const GZIP_MAGIC = Buffer.from([0x1f, 0x8b]);
+
+function isGzip(raw: Buffer): boolean {
+  return raw.length >= 2 && raw.subarray(0, 2).equals(GZIP_MAGIC);
+}
+
+/** Text content types (text/*, JSON, form data) are rejected, like the real API. */
+export function isTextContentType(contentType: string | undefined): boolean {
+  const t = (contentType ?? '').split(';')[0]!.trim().toLowerCase();
+  return t.startsWith('text/') || t === 'application/json' || t.endsWith('+json') || t === 'application/x-www-form-urlencoded';
+}
+
+function isAcceptedUpload(req: IncomingMessage, raw: Buffer): boolean {
+  const t = (req.headers['content-type'] ?? '').split(';')[0]!.trim().toLowerCase();
+  if (isTextContentType(t)) return false;
+  return t === 'application/gzip' && isGzip(raw);
+}
+
 function readBody(req: IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -104,11 +124,11 @@ export async function startMockServer(
     const raw = await readBody(req);
     let body = '';
     try {
-      body = req.headers['content-encoding'] === 'gzip' ? gunzipSync(raw).toString('utf8') : raw.toString('utf8');
+      body = isGzip(raw) ? gunzipSync(raw).toString('utf8') : raw.toString('utf8');
     } catch {
       body = '<<invalid gzip>>';
     }
-    const rec: RecordedRequest = { method: req.method ?? '', path: req.url ?? '', headers: req.headers, body };
+    const rec: RecordedRequest = { method: req.method ?? '', path: req.url ?? '', headers: req.headers, raw, body };
     try {
       if (body) rec.json = JSON.parse(body);
     } catch {
@@ -120,6 +140,9 @@ export async function startMockServer(
     let r: MockResponse;
     if (config.apiKey !== undefined && req.headers.authorization !== `Bearer ${config.apiKey}`) {
       r = err(401, 'unauthorized', 'Invalid API key');
+    } else if (req.method === 'POST' && req.url === '/v1/uploads' && !isAcceptedUpload(req, raw)) {
+      // Same contract as the real API: the body must be raw gzip bytes sent as application/gzip.
+      r = err(400, 'invalid_encoding', 'Send the gzip body with Content-Type: application/gzip');
     } else if (req.method === 'POST' && req.url === '/v1/uploads') {
       r = next(config.upload, uploadIdx++);
     } else if (req.method === 'GET' && /^\/v1\/uploads\/[^/]+\/verdict$/.test(req.url ?? '')) {

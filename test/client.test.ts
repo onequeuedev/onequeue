@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ApiError, OneQueueClient, validateApiUrl } from '../src/lib/client.ts';
 import { SCENARIOS, startMockServer, type MockConfig, type MockServer } from './mock-server.ts';
@@ -40,7 +41,7 @@ async function client(cfg: MockConfig, extra: Partial<ConstructorParameters<type
 }
 
 describe('upload', () => {
-  it('POSTs gzip JSON with bearer auth and an Idempotency-Key', async () => {
+  it('POSTs raw gzip bytes as application/gzip with bearer auth and an Idempotency-Key', async () => {
     const { c } = await client(SCENARIOS.accepted);
     const res = await c.upload({ hello: 'world' });
     expect(res).toEqual({ id: 'upl_test123', attempts: 1 });
@@ -48,11 +49,18 @@ describe('upload', () => {
     expect(req.method).toBe('POST');
     expect(req.path).toBe('/v1/uploads');
     expect(req.headers.authorization).toBe(`Bearer ${KEY}`);
-    expect(req.headers['content-encoding']).toBe('gzip');
-    expect(req.headers['content-type']).toBe('application/json');
+    expect(req.headers['content-type']).toBe('application/gzip');
+    expect(req.headers['content-encoding']).toBeUndefined();
+    expect([...req.raw.subarray(0, 2)]).toEqual([0x1f, 0x8b]);
     expect(req.headers['idempotency-key']).toMatch(/^[0-9a-f-]{36}$/);
     expect(req.headers['user-agent']).toBe('onequeue-action/test');
     expect(req.json).toEqual({ hello: 'world' });
+  });
+
+  it('reuses a caller-supplied Idempotency-Key', async () => {
+    const { c } = await client(SCENARIOS.accepted);
+    await c.upload({}, 'run-key-1');
+    expect(server!.requests[0]!.headers['idempotency-key']).toBe('run-key-1');
   });
 
   it('retries 5xx up to 3 times with exponential backoff and the same Idempotency-Key', async () => {
@@ -108,6 +116,44 @@ describe('upload', () => {
   it('does not follow redirects (Authorization would be forwarded)', async () => {
     const { c } = await client({ upload: [{ status: 307, headers: { location: 'https://evil.example/' } }], verdict: [] });
     await expect(c.upload({})).rejects.toThrow();
+    expect(server!.requests).toHaveLength(1);
+  });
+});
+
+describe('mock server enforces the upload encoding like the real API', () => {
+  const gz = gzipSync(Buffer.from('{}'));
+  const post = (s: MockServer, contentType: string, body: Buffer | string, extra: Record<string, string> = {}) =>
+    fetch(`${s.url}/v1/uploads`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${KEY}`, 'content-type': contentType, ...extra },
+      body,
+    });
+
+  it.each(['application/json', 'application/json; charset=utf-8', 'text/plain', 'application/vnd.api+json'])(
+    'rejects %s with 400 invalid_encoding',
+    async (ct) => {
+      server = await startMockServer({ ...SCENARIOS.accepted, apiKey: KEY });
+      const res = await post(server, ct, gz, { 'content-encoding': 'gzip' });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as any).error.code).toBe('invalid_encoding');
+    },
+  );
+
+  it('rejects application/gzip whose body is not gzip', async () => {
+    server = await startMockServer({ ...SCENARIOS.accepted, apiKey: KEY });
+    const res = await post(server, 'application/gzip', '{"a":1}');
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as any).error.code).toBe('invalid_encoding');
+  });
+
+  it('accepts raw gzip bytes sent as application/gzip', async () => {
+    server = await startMockServer({ ...SCENARIOS.accepted, apiKey: KEY });
+    expect((await post(server, 'application/gzip', gz)).status).toBe(202);
+  });
+
+  it('the client surfaces 400 invalid_encoding without retrying', async () => {
+    const { c } = await client({ upload: [{ status: 400, body: { error: { code: 'invalid_encoding', message: 'x' } } }], verdict: [] });
+    await expect(c.upload({})).rejects.toMatchObject({ status: 400, code: 'invalid_encoding' });
     expect(server!.requests).toHaveLength(1);
   });
 });

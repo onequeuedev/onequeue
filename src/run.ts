@@ -2,6 +2,7 @@
  * Orchestration for the GitHub Action. All side effects are injectable so the
  * whole flow can be tested against the mock API server.
  */
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -168,7 +169,8 @@ export async function run(deps: RunDeps): Promise<number> {
           debug: (m) => log.debug(m),
         });
         try {
-          const res = await client.upload(envelope);
+          // One key per run; the client reuses it on every retry.
+          const res = await client.upload(envelope, randomUUID());
           uploadId = res.id;
           uploaded = findings;
           log.info(`Uploaded ${findings} redacted finding(s). Upload ID: ${res.id}`);

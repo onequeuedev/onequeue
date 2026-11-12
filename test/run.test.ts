@@ -117,6 +117,22 @@ describe('upload mode', () => {
     expect(outputs()).toContain('upload-id=upl_test123');
   });
 
+  it('sends the envelope as raw gzip bytes with Content-Type application/gzip', async () => {
+    expect(await go()).toBe(0);
+    const req = uploads()[0]!;
+    expect(req.headers['content-type']).toBe('application/gzip');
+    expect(req.headers['content-encoding']).toBeUndefined();
+    expect([...req.raw.subarray(0, 2)]).toEqual([0x1f, 0x8b]);
+    expect(req.headers.authorization).toBe(`Bearer ${KEY}`);
+    expect(req.headers['idempotency-key']).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('uses one Idempotency-Key per run, reused on every retry', async () => {
+    expect(await go({ scenario: SCENARIOS.error500 })).toBe(0);
+    expect(uploads()).toHaveLength(4);
+    expect(new Set(uploads().map((r) => r.headers['idempotency-key'])).size).toBe(1);
+  });
+
   it('never sends planted secrets, environment variables or source code', async () => {
     const hostile = (t: 'trivy' | 'semgrep' | 'gitleaks') => JSON.stringify(makeHostile(JSON.parse(fixtureText(t, ws())), PLAIN_SECRET));
     expect(await go({ scans: { trivy: hostile('trivy'), semgrep: hostile('semgrep'), gitleaks: hostile('gitleaks') } })).toBe(0);

@@ -100,9 +100,9 @@ requests is in [`examples/onequeue.yml`](examples/onequeue.yml).
    a private temp directory, which is deleted at the end of the step. If a
    scanner crashes, the action prints a warning and continues with the others.
 2. Every SARIF file is redacted (see below).
-3. The redacted findings are uploaded as gzip JSON to
-   `POST {api-url}/v1/uploads`, with a `Bearer` token and an
-   `Idempotency-Key`. Network errors, `408`, `429` and `5xx` are retried up
+3. The redacted findings are uploaded to `POST {api-url}/v1/uploads` as
+   raw gzip bytes of the JSON envelope (`Content-Type: application/gzip`),
+   with a `Bearer` token and an `Idempotency-Key` (one per run). Network errors, `408`, `429` and `5xx` are retried up
    to 3 times with exponential backoff (1 s, 2 s, 4 s). The same
    `Idempotency-Key` is used on every retry, so a retry can't create a
    duplicate upload. Redirects are never followed.
@@ -304,8 +304,9 @@ The metadata values are illustrative.
 ```
 
 Request headers: `Authorization: Bearer <api-key>`, `Content-Type:
-application/json`, `Content-Encoding: gzip`, `Idempotency-Key: <uuid>`,
-`User-Agent: onequeue-action/<version>`.
+application/gzip`, `Idempotency-Key: <uuid>` (one per run, reused on
+retries), `User-Agent: onequeue-action/<version>`. There is no
+`Content-Encoding` header: the body is the gzip file itself.
 
 The full API contract is in [docs/openapi.yaml](docs/openapi.yaml).
 
