@@ -11,7 +11,7 @@ describe('parseInputs', () => {
     expect(problems).toEqual([]);
     expect(inputs).toEqual({
       apiKey: 'k',
-      apiUrl: 'https://api.onequeue.dev',
+      apiUrl: 'https://n3m2eiznc2.execute-api.us-east-1.amazonaws.com',
       scanners: ['trivy', 'semgrep', 'gitleaks'],
       mode: 'upload',
       failOn: 'critical',
@@ -72,5 +72,14 @@ describe('parseInputs', () => {
     const r = parseInputs(env({ 'api-key': '' }));
     expect(r.inputs.apiKey).toBe('');
     expect(r.problems).toEqual([]);
+  });
+});
+
+describe('api-url default', () => {
+  it('uses DEFAULT_API_URL when api-url is empty (action.yml default) and allows overriding it', async () => {
+    const { DEFAULT_API_URL } = await import('../src/inputs.ts');
+    expect(DEFAULT_API_URL).toBe('https://n3m2eiznc2.execute-api.us-east-1.amazonaws.com');
+    expect(parseInputs(env({ 'api-key': 'k', 'api-url': '' })).inputs.apiUrl).toBe(DEFAULT_API_URL);
+    expect(parseInputs(env({ 'api-key': 'k', 'api-url': 'https://api.example.com' })).inputs.apiUrl).toBe('https://api.example.com');
   });
 });

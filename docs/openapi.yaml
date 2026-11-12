@@ -22,7 +22,7 @@ info:
     name: OneQueue
     url: https://github.com/onequeuedev/onequeue/security/advisories/new
 servers:
-  - url: https://api.onequeue.dev
+  - url: https://n3m2eiznc2.execute-api.us-east-1.amazonaws.com
 security:
   - bearerAuth: []
 

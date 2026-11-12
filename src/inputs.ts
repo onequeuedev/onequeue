@@ -25,7 +25,12 @@ export interface ParsedInputs {
   fatal?: string;
 }
 
-export const DEFAULT_API_URL = 'https://api.onequeue.dev';
+/**
+ * Default OneQueue API base URL. This is the only place the default is set:
+ * action.yml leaves api-url empty so this constant applies. Moving to a custom
+ * domain later is a one-line change here.
+ */
+export const DEFAULT_API_URL = 'https://n3m2eiznc2.execute-api.us-east-1.amazonaws.com';
 
 /** Docker actions receive inputs as INPUT_<NAME> with the hyphen kept. */
 export function getInput(env: NodeJS.ProcessEnv, name: string): string {

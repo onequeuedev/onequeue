@@ -13,9 +13,11 @@ inputs:
       except for the local Gitleaks rule in gate mode.
     required: true
   api-url:
-    description: OneQueue API base URL. Must be https:// (http:// is allowed only for localhost).
+    description: >-
+      OneQueue API base URL. Leave empty to use the OneQueue API (the default is set in src/inputs.ts).
+      Must be https:// (http:// is allowed only for localhost).
     required: false
-    default: https://api.onequeue.dev
+    default: ""
   scanners:
     description: Comma-separated scanners to run. Any of trivy, semgrep, gitleaks.
     required: false

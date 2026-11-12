@@ -77,7 +77,7 @@ requests is in [`examples/onequeue.yml`](examples/onequeue.yml).
 | Input | Default | Description |
 | --- | --- | --- |
 | `api-key` | (required) | OneQueue API key. Use the secret `ONEQUEUE_API_KEY`. Masked with `::add-mask::` and never logged. |
-| `api-url` | `https://api.onequeue.dev` | API base URL. Must be `https://`; `http://` is allowed only for `localhost`. |
+| `api-url` | `https://n3m2eiznc2.execute-api.us-east-1.amazonaws.com` | API base URL. Leave unset to use the OneQueue API. Must be `https://`; `http://` is allowed only for `localhost`. |
 | `scanners` | `trivy,semgrep,gitleaks` | Comma-separated list. Only these scanners run. |
 | `mode` | `upload` | `upload` or `gate`. |
 | `fail-on` | `critical` | Gate mode: `critical`, `high` or `none`. Sent to the server, which computes the verdict. |
