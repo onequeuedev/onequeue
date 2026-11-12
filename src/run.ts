@@ -155,7 +155,7 @@ export async function run(deps: RunDeps): Promise<number> {
         // Should be impossible; refuse rather than leak.
         server = { kind: 'upload-failed', message: 'payload failed the secret tripwire check, upload aborted' };
         uploadNote = 'aborted by secret tripwire';
-        log.warning('OneQueue upload aborted: the redacted payload still contained a secret value. Please report this to security@onequeue.dev.');
+        log.warning('OneQueue upload aborted: the redacted payload still contained a secret value. Please report this privately via the Security tab of github.com/onequeuedev/onequeue (Report a vulnerability).');
       } else {
         const client = new OneQueueClient({
           apiUrl: inputs.apiUrl,

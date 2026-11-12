@@ -124,7 +124,7 @@ describe('pollVerdict', () => {
   it('returns fail with reason and details URL', async () => {
     const { c } = await client(SCENARIOS.fail);
     const r = await c.pollVerdict('upl_test123', 30_000);
-    expect(r).toMatchObject({ kind: 'verdict', verdict: { status: 'fail', detailsUrl: 'https://app.onequeue.dev/uploads/upl_test123' } });
+    expect(r).toMatchObject({ kind: 'verdict', verdict: { status: 'fail', detailsUrl: 'https://app.example.com/uploads/upl_test123' } });
   });
 
   it('times out when the verdict stays pending', async () => {
@@ -147,10 +147,10 @@ describe('pollVerdict', () => {
 });
 
 describe('validateApiUrl', () => {
-  it.each(['https://api.onequeue.dev', 'https://api.example.com/prefix', 'http://localhost:8080', 'http://127.0.0.1:1'])('accepts %s', (u) => {
+  it.each(['https://api.example.com', 'https://api.example.com/prefix', 'http://localhost:8080', 'http://127.0.0.1:1'])('accepts %s', (u) => {
     expect(() => validateApiUrl(u)).not.toThrow();
   });
-  it.each(['http://api.onequeue.dev', 'ftp://x', 'not a url', 'https://u:p@host', 'https://host/?a=1'])('rejects %s', (u) => {
+  it.each(['http://api.example.com', 'ftp://x', 'not a url', 'https://u:p@host', 'https://host/?a=1'])('rejects %s', (u) => {
     expect(() => validateApiUrl(u)).toThrow();
   });
 });

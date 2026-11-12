@@ -4,8 +4,10 @@ OneQueue Scan is the GitHub Action for OneQueue.
 
 ## Reporting a vulnerability
 
-Email **security@onequeue.dev**. Please do not open a public GitHub issue
-for security problems.
+Report vulnerabilities privately through GitHub: open this repository's
+**Security** tab and click **Report a vulnerability**
+(<https://github.com/onequeuedev/onequeue/security/advisories/new>).
+Please do not open a public GitHub issue for security problems.
 
 Include, where you can:
 

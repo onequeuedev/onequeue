@@ -340,8 +340,9 @@ with no GitHub Actions dependencies, so it can be reused by a CLI later.
 
 ## Security
 
-To report a vulnerability, email security@onequeue.dev. See
-[SECURITY.md](SECURITY.md).
+To report a vulnerability, use GitHub private vulnerability reporting: the
+repository's **Security** tab, then **Report a vulnerability**. Please do not
+open a public issue. See [SECURITY.md](SECURITY.md).
 
 ## License
 

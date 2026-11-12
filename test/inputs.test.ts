@@ -27,7 +27,7 @@ describe('parseInputs', () => {
     const { inputs, problems } = parseInputs(
       env({
         'api-key': 'k',
-        'api-url': 'https://eu.api.onequeue.dev',
+        'api-url': 'https://eu.api.example.com',
         scanners: 'Gitleaks, trivy,gitleaks',
         mode: 'GATE',
         'fail-on': 'high',
@@ -39,7 +39,7 @@ describe('parseInputs', () => {
     );
     expect(problems).toEqual([]);
     expect(inputs).toMatchObject({
-      apiUrl: 'https://eu.api.onequeue.dev',
+      apiUrl: 'https://eu.api.example.com',
       scanners: ['gitleaks', 'trivy'],
       mode: 'gate',
       failOn: 'high',
@@ -59,7 +59,7 @@ describe('parseInputs', () => {
     ['gitleaks-history', 'yes'],
     ['scanners', 'snyk'],
     ['semgrep-config', '--dangerous'],
-    ['api-url', 'http://api.onequeue.dev'],
+    ['api-url', 'http://api.example.com'],
   ])('reports a problem for %s=%s', (name, value) => {
     expect(parseInputs(env({ [name]: value })).problems.length).toBeGreaterThanOrEqual(1);
   });

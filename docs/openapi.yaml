@@ -20,7 +20,7 @@ info:
     header is never sent to another location.
   contact:
     name: OneQueue
-    email: security@onequeue.dev
+    url: https://github.com/onequeuedev/onequeue/security/advisories/new
 servers:
   - url: https://api.onequeue.dev
 security:
