@@ -1,7 +1,7 @@
 name: Release image
 
 # Builds the container image, pushes it to Docker Hub (docker.io/rhysha/onequeuedev)
-# and prints the digest to pin in action.yml. See RELEASING.md.
+# and prints the digest to pin in action.yml (runs.image).
 #
 # Needs, in the repository settings (Secrets and variables -> Actions):
 #   secret DOCKERHUB_TOKEN  a Docker Hub access token (Read & Write) for the user rhysha

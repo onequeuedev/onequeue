@@ -26,4 +26,6 @@ updates:
       interval: weekly
 
 # Note: Trivy and Gitleaks are downloaded as release tarballs with pinned
-# SHA256 values in the Dockerfile. Dependabot cannot update them; see RELEASING.md.
+# SHA256 values in the Dockerfile. Dependabot cannot update them; update the
+# version and per-architecture *_SHA256 build args by hand from the upstream
+# checksums file, and update THIRD_PARTY_NOTICES.md.
