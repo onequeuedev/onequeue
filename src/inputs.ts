@@ -1,3 +1,4 @@
+import { isAbsolute, normalize, sep } from 'node:path';
 import { validateApiUrl } from './lib/client.ts';
 import type { Mode, OnTimeout } from './lib/gate.ts';
 import type { ScannerName } from './lib/redact/types.ts';
@@ -15,6 +16,10 @@ export interface Inputs {
   onTimeout: OnTimeout;
   semgrepConfigs: string[];
   gitleaksHistory: boolean;
+  /** Write the envelope to outputFile instead of uploading; never fail the build. */
+  dryRun: boolean;
+  /** Dry-run output path, relative to the workspace (validated: no absolute paths, no ..). */
+  outputFile: string;
 }
 
 export interface ParsedInputs {
@@ -32,18 +37,47 @@ export interface ParsedInputs {
  */
 export const DEFAULT_API_URL = 'https://n3m2eiznc2.execute-api.us-east-1.amazonaws.com';
 
+export const DEFAULT_OUTPUT_FILE = 'onequeue-payload.json';
+
 /** Docker actions receive inputs as INPUT_<NAME> with the hyphen kept. */
 export function getInput(env: NodeJS.ProcessEnv, name: string): string {
   return (env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] ?? '').trim();
 }
 
+function parseDryRun(env: NodeJS.ProcessEnv, problems: string[]): boolean {
+  const raw = getInput(env, 'dry-run').toLowerCase() || 'false';
+  if (raw === 'true') return true;
+  if (raw !== 'false') problems.push(`Invalid input dry-run="${raw.slice(0, 32)}". Expected true or false.`);
+  return false;
+}
+
+/**
+ * output-file must be a path inside the workspace. This is a Docker action, so
+ * only the workspace is shared with later steps; absolute runner paths and ".."
+ * would point somewhere else inside the container.
+ */
+function parseOutputFile(env: NodeJS.ProcessEnv, problems: string[]): string {
+  const raw = getInput(env, 'output-file');
+  if (!raw) return DEFAULT_OUTPUT_FILE;
+  const norm = normalize(raw);
+  if (isAbsolute(raw) || norm === '..' || norm.startsWith(`..${sep}`) || norm === '.' || norm.endsWith(sep) || raw.includes('\0')) {
+    problems.push(
+      `Invalid input output-file="${raw.slice(0, 64)}". Use a file path relative to the workspace, without "..". Using ${DEFAULT_OUTPUT_FILE}.`,
+    );
+    return DEFAULT_OUTPUT_FILE;
+  }
+  return norm;
+}
+
 export function parseInputs(env: NodeJS.ProcessEnv): ParsedInputs {
   const problems: string[] = [];
+  const dryRun = parseDryRun(env, problems);
+  const outputFile = parseOutputFile(env, problems);
 
   const modeRaw = getInput(env, 'mode').toLowerCase() || 'upload';
   if (modeRaw !== 'upload' && modeRaw !== 'gate') {
     return {
-      inputs: defaults(env),
+      inputs: { ...defaults(env), dryRun, outputFile },
       problems,
       fatal: `Invalid input mode="${modeRaw.slice(0, 32)}". Expected "upload" or "gate".`,
     };
@@ -103,6 +137,8 @@ export function parseInputs(env: NodeJS.ProcessEnv): ParsedInputs {
       onTimeout,
       semgrepConfigs: semgrepConfigs.filter((c) => !c.startsWith('-')),
       gitleaksHistory,
+      dryRun,
+      outputFile,
     },
     problems,
   };
@@ -119,5 +155,7 @@ function defaults(env: NodeJS.ProcessEnv): Inputs {
     onTimeout: 'pass',
     semgrepConfigs: ['p/default'],
     gitleaksHistory: false,
+    dryRun: false,
+    outputFile: DEFAULT_OUTPUT_FILE,
   };
 }

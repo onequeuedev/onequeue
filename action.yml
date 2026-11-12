@@ -52,6 +52,17 @@ inputs:
       Author, email, date and commit message are always removed before upload.
     required: false
     default: "false"
+  dry-run:
+    description: >-
+      "true" runs the scanners and redaction, writes the exact JSON payload that would be uploaded
+      (before gzip) to output-file, and sends nothing to the OneQueue API. Never fails the build.
+    required: false
+    default: "false"
+  output-file:
+    description: >-
+      Dry run only. Where to write the payload, relative to the workspace (no absolute paths or "..").
+    required: false
+    default: onequeue-payload.json
 
 outputs:
   upload-id:

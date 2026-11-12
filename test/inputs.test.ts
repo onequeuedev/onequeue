@@ -19,6 +19,8 @@ describe('parseInputs', () => {
       onTimeout: 'pass',
       semgrepConfigs: ['p/default'],
       gitleaksHistory: false,
+      dryRun: false,
+      outputFile: 'onequeue-payload.json',
     });
     expect(getInput({ 'INPUT_API-KEY': 'x' }, 'api-key')).toBe('x');
   });
@@ -60,6 +62,10 @@ describe('parseInputs', () => {
     ['scanners', 'snyk'],
     ['semgrep-config', '--dangerous'],
     ['api-url', 'http://api.example.com'],
+    ['dry-run', 'yes'],
+    ['output-file', '/etc/passwd'],
+    ['output-file', '../outside.json'],
+    ['output-file', 'out/../../outside.json'],
   ])('reports a problem for %s=%s', (name, value) => {
     expect(parseInputs(env({ [name]: value })).problems.length).toBeGreaterThanOrEqual(1);
   });
@@ -81,5 +87,24 @@ describe('api-url default', () => {
     expect(DEFAULT_API_URL).toBe('https://n3m2eiznc2.execute-api.us-east-1.amazonaws.com');
     expect(parseInputs(env({ 'api-key': 'k', 'api-url': '' })).inputs.apiUrl).toBe(DEFAULT_API_URL);
     expect(parseInputs(env({ 'api-key': 'k', 'api-url': 'https://api.example.com' })).inputs.apiUrl).toBe('https://api.example.com');
+  });
+});
+
+describe('dry-run inputs', () => {
+  it('parses dry-run and a relative output-file', () => {
+    const { inputs, problems } = parseInputs(env({ 'dry-run': 'TRUE', 'output-file': './out/payload.json' }));
+    expect(problems).toEqual([]);
+    expect(inputs).toMatchObject({ dryRun: true, outputFile: 'out/payload.json' });
+  });
+
+  it('falls back to the default output-file for unsafe paths', () => {
+    const { inputs } = parseInputs(env({ 'dry-run': 'true', 'output-file': '../x.json' }));
+    expect(inputs.outputFile).toBe('onequeue-payload.json');
+  });
+
+  it('keeps dryRun when the mode is invalid, so a dry run can still exit 0', () => {
+    const r = parseInputs(env({ 'dry-run': 'true', mode: 'block' }));
+    expect(r.fatal).toBeDefined();
+    expect(r.inputs.dryRun).toBe(true);
   });
 });

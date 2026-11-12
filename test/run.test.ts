@@ -1,4 +1,6 @@
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
+import { OneQueueClient } from '../src/lib/client.ts';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -350,5 +352,107 @@ describe('inputs', () => {
 
   it('refuses plain http to a non-local API (key would travel in clear text)', async () => {
     expect(await go({ inputs: { 'api-url': 'http://api.example.com', mode: 'gate' } })).toBe(1);
+  });
+});
+
+describe('dry run', () => {
+  const payloadPath = (f = 'onequeue-payload.json') => join(ws(), f);
+  const noNetwork = () => {
+    const calls: string[] = [];
+    const f = (async (url: string) => {
+      calls.push(String(url));
+      throw new Error('network must not be used in a dry run');
+    }) as unknown as typeof fetch;
+    return { f, calls };
+  };
+
+  async function dry(inputs: Record<string, string> = {}, scans?: Partial<Record<string, string>>, apiKey = KEY) {
+    const net = noNetwork();
+    const code = await run({
+      env: baseEnv({ 'api-key': apiKey, 'dry-run': 'true', ...inputs }),
+      write: (l) => lines.push(l),
+      runCommand: fakeRunner(scans ?? { trivy: fixtureText('trivy', ws()), semgrep: fixtureText('semgrep', ws()), gitleaks: cleanGitleaks() }),
+      fetch: net.f,
+      sleep: async () => {},
+      backoffMs: 1,
+    });
+    return { code, netCalls: net.calls };
+  }
+
+  it('writes the exact JSON that a real run gzips and uploads, and makes no network call', async () => {
+    const { code, netCalls } = await dry();
+    expect(code).toBe(0);
+    expect(netCalls).toEqual([]);
+    const written = readFileSync(payloadPath(), 'utf8');
+
+    // Same inputs without dry-run: the server receives gzip(written), byte for byte.
+    expect(await go()).toBe(0);
+    const req = uploads()[0]!;
+    expect(gunzipSync(req.raw).toString('utf8')).toBe(written);
+    expect(OneQueueClient.encode(JSON.parse(written)).equals(req.raw)).toBe(true);
+    expect(JSON.parse(written)).toMatchObject({ schemaVersion: 1, mode: 'upload', failOn: 'critical', sarif: { version: '2.1.0' } });
+  });
+
+  it('writes to a custom output-file inside the workspace', async () => {
+    expect((await dry({ 'output-file': 'reports/oq.json' })).code).toBe(0);
+    expect(JSON.parse(readFileSync(payloadPath('reports/oq.json'), 'utf8')).schemaVersion).toBe(1);
+    expect(outputs()).toContain('upload-id=\n');
+    expect(outputs()).toContain('verdict=n/a');
+    expect(summary()).toContain('dry run: payload written to reports/oq.json');
+  });
+
+  it('keeps every redaction guarantee in the written file', async () => {
+    const hostile = (t: 'trivy' | 'semgrep' | 'gitleaks') => JSON.stringify(makeHostile(JSON.parse(fixtureText(t, ws())), PLAIN_SECRET));
+    expect((await dry({}, { trivy: hostile('trivy'), semgrep: hostile('semgrep'), gitleaks: hostile('gitleaks') })).code).toBe(0);
+    const written = readFileSync(payloadPath(), 'utf8');
+    assertNoLeak(written, [FAKE_TOKEN, PLAIN_SECRET, KEY]);
+    expect(lines[0]).toBe(`::add-mask::${KEY}`);
+    expect(lines.slice(1).join('\n')).not.toContain(KEY);
+  });
+
+  it('runs every enabled scanner and writes the payload even without an api-key', async () => {
+    const calls: RecordedCall[] = [];
+    const code = await run({
+      env: baseEnv({ 'api-key': '', 'dry-run': 'true' }),
+      write: (l) => lines.push(l),
+      runCommand: fakeRunner({ trivy: fixtureText('trivy', ws()), semgrep: fixtureText('semgrep', ws()), gitleaks: cleanGitleaks() }, calls),
+      fetch: noNetwork().f,
+    });
+    expect(code).toBe(0);
+    expect(calls.map((c) => c.cmd).sort()).toEqual(['gitleaks', 'semgrep', 'trivy']);
+    expect(existsSync(payloadPath())).toBe(true);
+  });
+
+  it('never fails the build in gate mode, even with Gitleaks findings', async () => {
+    const r = await dry({ mode: 'gate', 'on-timeout': 'fail' }, { trivy: fixtureText('trivy', ws()), semgrep: fixtureText('semgrep', ws()), gitleaks: fixtureText('gitleaks', ws()) });
+    expect(r.code).toBe(0);
+    expect(r.netCalls).toEqual([]);
+    expect(out()).toMatch(/::warning::Gitleaks found 2 secret\(s\)\. A dry run does not fail the build, but gate mode would/);
+    expect(out()).not.toContain('::error::');
+    expect(JSON.parse(readFileSync(payloadPath(), 'utf8')).mode).toBe('gate');
+  });
+
+  it('never fails the build on invalid inputs in gate mode or an unknown mode', async () => {
+    expect((await dry({ mode: 'gate', 'fail-on': 'medium' })).code).toBe(0);
+    expect((await dry({ mode: 'block' })).code).toBe(0);
+    expect(out()).not.toContain('::error::');
+  });
+
+  it('never fails the build when the file cannot be written', async () => {
+    mkdirSync(payloadPath(), { recursive: true }); // a directory where the file should go
+    expect((await dry()).code).toBe(0);
+    expect(out()).toMatch(/::warning::OneQueue dry run: could not write/);
+  });
+
+  it('refuses to write through a symlink and falls back on unsafe paths', async () => {
+    mkdirSync(ws(), { recursive: true });
+    symlinkSync(join(dir, 'elsewhere.json'), payloadPath());
+    expect((await dry()).code).toBe(0);
+    expect(existsSync(join(dir, 'elsewhere.json'))).toBe(false);
+    expect(out()).toMatch(/symbolic link/);
+
+    lines = [];
+    expect((await dry({ 'output-file': '../escape.json' })).code).toBe(0);
+    expect(existsSync(join(dir, 'escape.json'))).toBe(false);
   });
 });

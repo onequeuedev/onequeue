@@ -85,6 +85,8 @@ requests is in [`examples/onequeue.yml`](examples/onequeue.yml).
 | `on-timeout` | `pass` | Gate mode: `pass` (warn) or `fail` when there is no verdict in time or the upload fails. |
 | `semgrep-config` | `p/default` | Comma-separated Semgrep configs: registry rulesets or paths in your repo (for example `p/owasp-top-ten,.semgrep/`). |
 | `gitleaks-history` | `false` | Scan git history instead of only current files. Needs `fetch-depth: 0` on checkout. |
+| `dry-run` | `false` | Write the exact payload to `output-file` instead of uploading. Never fails the build. See [Dry run](#dry-run-inspect-exactly-what-would-be-sent). |
+| `output-file` | `onequeue-payload.json` | Dry run only. Path relative to the workspace (no absolute paths, no `..`). |
 
 ## Outputs
 
@@ -133,6 +135,43 @@ empty. The action then:
 - in `upload` mode, warns about Gitleaks findings and exits 0,
 - in `gate` mode, fails the build if Gitleaks finds a secret, and otherwise
   exits 0.
+
+## Dry run: inspect exactly what would be sent
+
+Set `dry-run: true` to see the exact payload before anything leaves your
+runner. The action runs the scanners and the redactor as usual, then writes
+the final JSON envelope to `output-file`. That file is byte for byte the
+JSON that a real run gzips and uploads. Nothing is sent to the OneQueue
+API, no `api-key` is needed, and the step never fails the build, in either
+mode.
+
+```yaml
+      - uses: onequeuedev/onequeue@<full-commit-sha> # v1.0.1
+        with:
+          api-key: ${{ secrets.ONEQUEUE_API_KEY }}   # optional in a dry run
+          dry-run: true
+          output-file: onequeue-payload.json         # relative to the workspace
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: onequeue-payload
+          path: onequeue-payload.json
+```
+
+Then download the artifact and read it, or search it for anything you
+don't want to share, for example `grep -F 'my-secret-value' onequeue-payload.json`.
+
+Notes:
+
+- The scanners still download their own data (Trivy's vulnerability
+  database, Semgrep's rules), as in a normal run. Only the OneQueue API is
+  never contacted.
+- The same secret tripwire applies: if the payload contained a secret value
+  Gitleaks found, the file is not written.
+- `mode` and `fail-on` are recorded in the payload as they would be sent. A
+  dry run in gate mode warns about Gitleaks findings but does not fail.
+- The outputs are `upload-id` empty, `findings` the number of findings, and
+  `verdict` `n/a`.
 
 ## What is sent, and what is removed
 

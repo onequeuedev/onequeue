@@ -3,9 +3,9 @@
  * whole flow can be tested against the mock API server.
  */
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { OneQueueClient, type FetchFn, type SleepFn } from './lib/client.ts';
 import { decide, type ServerOutcome } from './lib/gate.ts';
 import { createLogger, type Writer } from './lib/log.ts';
@@ -45,24 +45,35 @@ export async function run(deps: RunDeps): Promise<number> {
   // Mask before anything else is printed.
   log.mask(parsed.inputs.apiKey);
 
+  const dryRun = parsed.inputs.dryRun;
   if (parsed.fatal) {
+    // Dry run never fails the build.
+    if (dryRun) {
+      log.warning(`${parsed.fatal} Dry run: nothing was written.`);
+      return 0;
+    }
     log.error(parsed.fatal);
     return 1;
   }
   const inputs = parsed.inputs;
+  // Gate mode treats input problems as fatal, except in a dry run, which never fails.
+  const strict = inputs.mode === 'gate' && !dryRun;
   for (const p of parsed.problems) {
-    if (inputs.mode === 'gate') log.error(p);
+    if (strict) log.error(p);
     else log.warning(`${p} Using defaults where possible.`);
   }
-  if (inputs.mode === 'gate' && parsed.problems.length > 0) return 1;
+  if (strict && parsed.problems.length > 0) return 1;
+  if (dryRun) {
+    log.info(`OneQueue dry run: nothing will be sent to the OneQueue API. The payload will be written to ${inputs.outputFile}.`);
+  }
 
   let outDir: string | undefined;
   try {
     return await execute();
   } catch (e) {
-    // Unexpected bug. Upload mode must never fail the build.
+    // Unexpected bug. Upload mode and dry runs must never fail the build.
     const msg = `OneQueue Scan hit an unexpected error: ${(e as Error).message}`;
-    if (inputs.mode === 'upload') {
+    if (inputs.mode === 'upload' || dryRun) {
       log.warning(msg);
       return 0;
     }
@@ -77,7 +88,8 @@ export async function run(deps: RunDeps): Promise<number> {
     const hasKey = inputs.apiKey.length > 0;
 
     let toRun = inputs.scanners;
-    if (!hasKey) {
+    // A dry run sends nothing, so it runs every enabled scanner even without a key.
+    if (!hasKey && !dryRun) {
       log.warning(
         'OneQueue api-key is empty, so nothing will be uploaded. This is expected for pull requests from forks, ' +
           'which cannot read repository secrets. Gitleaks still runs locally.',
@@ -140,7 +152,7 @@ export async function run(deps: RunDeps): Promise<number> {
     let uploaded: number | null = null;
     let uploadNote = '';
 
-    if (!hasKey) {
+    if (!hasKey && !dryRun) {
       server = { kind: 'skipped', reason: 'api-key is empty' };
       uploadNote = 'skipped: no api-key';
     } else {
@@ -151,6 +163,10 @@ export async function run(deps: RunDeps): Promise<number> {
         metadata: buildMetadata(env, actionVersion, reports),
         sarif: { version: '2.1.0', runs },
       };
+
+      if (dryRun) {
+        return finishDryRun(envelope, findings, reports, gitleaksFindings, secrets, workspace);
+      }
 
       if (containsSecret(JSON.stringify(envelope), secrets)) {
         // Should be impossible; refuse rather than leak.
@@ -204,4 +220,62 @@ export async function run(deps: RunDeps): Promise<number> {
 
     return decision.exitCode;
   }
+
+  /**
+   * Dry run: write the exact JSON text that would be gzipped and uploaded.
+   * No request is made to the OneQueue API, and the step always exits 0.
+   */
+  async function finishDryRun(
+    envelope: unknown,
+    findings: number,
+    reports: Partial<Record<ScannerName, ScannerReport>>,
+    gitleaksFindings: number | undefined,
+    secrets: string[],
+    workspace: string,
+  ): Promise<number> {
+    const json = OneQueueClient.serialize(envelope);
+    let note: string;
+    if (containsSecret(json, secrets)) {
+      // Same tripwire as a real upload: never write a payload that contains a secret.
+      note = 'dry run: payload failed the secret tripwire check, not written';
+      log.warning(
+        'OneQueue dry run: the redacted payload still contained a secret value, so it was not written. ' +
+          'Please report this privately via the Security tab of github.com/onequeuedev/onequeue (Report a vulnerability).',
+      );
+    } else {
+      try {
+        const target = await safeOutputPath(workspace, inputs.outputFile);
+        await writeFile(target, json, { encoding: 'utf8', mode: 0o644 });
+        note = `dry run: payload written to ${inputs.outputFile}`;
+        log.info(`OneQueue dry run: wrote the exact upload payload (${findings} finding(s), ${Buffer.byteLength(json)} bytes before gzip) to ${inputs.outputFile}. Nothing was uploaded.`);
+      } catch (e) {
+        note = 'dry run: could not write the payload';
+        log.warning(`OneQueue dry run: could not write ${inputs.outputFile}: ${(e as Error).message}`);
+      }
+    }
+    if ((gitleaksFindings ?? 0) > 0) {
+      log.warning(`Gitleaks found ${gitleaksFindings} secret(s). A dry run does not fail the build${inputs.mode === 'gate' ? ', but gate mode would' : ''}.`);
+    }
+    try {
+      writeSummary(env, { mode: `${inputs.mode} (dry run)`, scanners: reports, findingsUploaded: null, uploadId: null, uploadNote: note, gateResult: 'not gated (dry run)' });
+      setOutputs(env, { 'upload-id': '', findings: String(findings), verdict: 'n/a' });
+    } catch (e) {
+      log.warning(`Could not write the step summary or outputs: ${(e as Error).message}`);
+    }
+    return 0;
+  }
+}
+
+/** Resolve output-file inside the workspace; refuse symlinks that would point elsewhere. */
+async function safeOutputPath(workspace: string, outputFile: string): Promise<string> {
+  const target = resolve(workspace, outputFile);
+  await mkdir(dirname(target), { recursive: true });
+  const realWs = await realpath(workspace);
+  const realParent = await realpath(dirname(target));
+  const rel = relative(realWs, realParent);
+  if (rel.startsWith('..') || isAbsolute(rel)) throw new Error('output-file resolves outside the workspace');
+  const existing = await lstat(target).catch(() => undefined);
+  if (existing?.isSymbolicLink()) throw new Error('output-file is a symbolic link');
+  if (existing && !existing.isFile()) throw new Error('output-file exists and is not a regular file');
+  return join(realParent, basename(target));
 }
