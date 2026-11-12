@@ -1,0 +1,119 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "fullName": "Trivy Vulnerability Scanner",
+          "informationUri": "https://github.com/aquasecurity/trivy",
+          "name": "Trivy",
+          "version": "0.76.1",
+          "rules": [
+            {
+              "id": "CVE-2021-23337",
+              "name": "LanguageSpecificPackageVulnerability",
+              "shortDescription": { "text": "nodejs-lodash: command injection via template" },
+              "fullDescription": { "text": "Lodash versions prior to 4.17.21 are vulnerable to Command Injection via the template function." },
+              "defaultConfiguration": { "level": "error" },
+              "helpUri": "https://avd.aquasec.com/nvd/cve-2021-23337",
+              "help": {
+                "text": "Vulnerability CVE-2021-23337 __PLAIN_SECRET__",
+                "markdown": "**Vulnerability CVE-2021-23337** __PLAIN_SECRET__"
+              },
+              "properties": {
+                "precision": "very-high",
+                "security-severity": "7.2",
+                "tags": ["vulnerability", "security", "HIGH"]
+              }
+            },
+            {
+              "id": "DS-0002",
+              "name": "Misconfiguration",
+              "shortDescription": { "text": "Image user should not be 'root'" },
+              "defaultConfiguration": { "level": "error" },
+              "helpUri": "https://avd.aquasec.com/misconfig/ds-0002",
+              "properties": {
+                "precision": "very-high",
+                "security-severity": "7.0",
+                "tags": ["misconfiguration", "security", "HIGH"]
+              }
+            },
+            {
+              "id": "aws-access-key-id",
+              "name": "Secret",
+              "shortDescription": { "text": "AWS Access Key ID" },
+              "defaultConfiguration": { "level": "error" },
+              "properties": {
+                "precision": "very-high",
+                "security-severity": "9.5",
+                "tags": ["secret", "security", "CRITICAL"]
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CVE-2021-23337",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "text": "Package: lodash\nInstalled Version: 4.17.20\nVulnerability CVE-2021-23337\nSeverity: HIGH\nFixed Version: 4.17.21\nLink: [CVE-2021-23337](https://avd.aquasec.com/nvd/cve-2021-23337)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "package-lock.json", "uriBaseId": "ROOTPATH" },
+                "region": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1,
+                  "snippet": { "text": "\"lodash\": \"4.17.20\" // __PLAIN_SECRET__" }
+                }
+              },
+              "message": { "text": "package-lock.json: lodash@4.17.20" }
+            }
+          ]
+        },
+        {
+          "ruleId": "DS-0002",
+          "ruleIndex": 1,
+          "level": "error",
+          "message": {
+            "text": "Artifact: Dockerfile\nType: dockerfile\nVulnerability DS-0002\nSeverity: HIGH\nMessage: Specify at least 1 USER command in Dockerfile with non-root user as argument\nLink: [DS-0002](https://avd.aquasec.com/misconfig/ds-0002)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "file://__WORKSPACE__/Dockerfile" },
+                "region": { "startLine": 1, "endLine": 1 },
+                "contextRegion": { "startLine": 1, "endLine": 3, "snippet": { "text": "FROM alpine\nENV TOKEN=__PLAIN_SECRET__" } }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "aws-access-key-id",
+          "ruleIndex": 2,
+          "level": "error",
+          "message": {
+            "text": "Artifact: config.env\nType: \nSecret AWS Access Key ID\nSeverity: CRITICAL\nMatch: AWS_ACCESS_KEY_ID=__FAKE_TOKEN__"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "config.env", "uriBaseId": "ROOTPATH" },
+                "region": { "startLine": 2, "endLine": 2, "snippet": { "text": "AWS_ACCESS_KEY_ID=__FAKE_TOKEN__" } }
+              }
+            }
+          ]
+        }
+      ],
+      "columnKind": "utf16CodeUnits",
+      "originalUriBaseIds": { "ROOTPATH": { "uri": "file://__WORKSPACE__/" } },
+      "properties": { "imageName": "__WORKSPACE__", "repoDigests": [] }
+    }
+  ]
+}

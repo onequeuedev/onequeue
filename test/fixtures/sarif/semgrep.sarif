@@ -1,0 +1,78 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "commandLine": "semgrep scan --config p/default __WORKSPACE__",
+          "environmentVariables": { "DB_PASSWORD": "__PLAIN_SECRET__" },
+          "workingDirectory": { "uri": "file://__WORKSPACE__/" },
+          "toolExecutionNotifications": [
+            { "level": "warning", "message": { "text": "Syntax error near __PLAIN_SECRET__" } }
+          ]
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "python.lang.security.audit.formatted-sql-query.formatted-sql-query",
+          "message": {
+            "text": "Detected possible formatted SQL query: cursor.execute(\"SELECT * FROM users WHERE pw='__PLAIN_SECRET__'\")"
+          },
+          "fingerprints": { "matchBasedId/v1": "__PLAIN_SECRET__" },
+          "properties": { "exposure": "reachable", "metavars": { "$PW": "__PLAIN_SECRET__" } },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "app/db.py", "uriBaseId": "%SRCROOT%" },
+                "region": {
+                  "startLine": 10,
+                  "startColumn": 5,
+                  "endLine": 12,
+                  "endColumn": 40,
+                  "snippet": { "text": "cursor.execute(\"SELECT * FROM users WHERE pw='__PLAIN_SECRET__'\")" }
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": { "text": "use params" },
+              "artifactChanges": [
+                {
+                  "artifactLocation": { "uri": "app/db.py" },
+                  "replacements": [
+                    { "deletedRegion": { "startLine": 10 }, "insertedContent": { "text": "__PLAIN_SECRET__" } }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "tool": {
+        "driver": {
+          "name": "Semgrep OSS",
+          "semanticVersion": "1.182.1",
+          "rules": [
+            {
+              "id": "python.lang.security.audit.formatted-sql-query.formatted-sql-query",
+              "name": "python.lang.security.audit.formatted-sql-query.formatted-sql-query",
+              "shortDescription": { "text": "Semgrep Finding: python.lang.security.audit.formatted-sql-query.formatted-sql-query" },
+              "fullDescription": { "text": "Detected possible formatted SQL query. Use parameterized queries instead." },
+              "defaultConfiguration": { "level": "warning" },
+              "help": { "text": "Detected possible formatted SQL query.", "markdown": "Detected possible formatted SQL query." },
+              "helpUri": "https://semgrep.dev/r/python.lang.security.audit.formatted-sql-query.formatted-sql-query",
+              "properties": {
+                "precision": "very-high",
+                "security-severity": "5.0",
+                "tags": ["CWE-89: SQL Injection", "MEDIUM CONFIDENCE", "security"]
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

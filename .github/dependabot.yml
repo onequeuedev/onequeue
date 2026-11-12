@@ -1,0 +1,29 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev-dependencies:
+        dependency-type: development
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Base images (pinned by digest in the Dockerfile).
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Semgrep and its dependencies (docker/semgrep-requirements.in -> .txt with hashes).
+  - package-ecosystem: pip
+    directory: /docker
+    schedule:
+      interval: weekly
+
+# Note: Trivy and Gitleaks are downloaded as release tarballs with pinned
+# SHA256 values in the Dockerfile. Dependabot cannot update them; see RELEASING.md.

@@ -1,0 +1,8 @@
+*
+!package.json
+!package-lock.json
+!tsconfig.json
+!src/
+!docker/
+!LICENSE
+!THIRD_PARTY_NOTICES.md

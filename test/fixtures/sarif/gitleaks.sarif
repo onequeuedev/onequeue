@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "gitleaks",
+          "semanticVersion": "v8.30.1",
+          "informationUri": "https://github.com/gitleaks/gitleaks",
+          "rules": [
+            {
+              "id": "github-pat",
+              "shortDescription": { "text": "Uncovered a GitHub Personal Access Token, potentially leading to unauthorized repository access and sensitive content exposure." }
+            },
+            {
+              "id": "generic-api-key",
+              "shortDescription": { "text": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations." }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "message": { "text": "github-pat has detected secret for file config/settings.py: __FAKE_TOKEN__" },
+          "ruleId": "github-pat",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "config/settings.py" },
+                "region": {
+                  "startLine": 3,
+                  "startColumn": 12,
+                  "endLine": 3,
+                  "endColumn": 52,
+                  "snippet": { "text": "__FAKE_TOKEN__" }
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "commitSha": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+            "email": "jane.dev@example.com",
+            "author": "Jane Dev",
+            "date": "2026-10-01T12:00:00Z",
+            "commitMessage": "add token __FAKE_TOKEN__"
+          },
+          "properties": {
+            "Secret": "__FAKE_TOKEN__",
+            "Match": "token = \"__FAKE_TOKEN__\"",
+            "Fingerprint": "4b825dc6:config/settings.py:github-pat:3:__FAKE_TOKEN__"
+          }
+        },
+        {
+          "message": { "text": "generic-api-key has detected secret for file .env." },
+          "ruleId": "generic-api-key",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": ".env" },
+                "region": { "startLine": 1, "endLine": 1, "snippet": { "text": "__PLAIN_SECRET__" } }
+              }
+            }
+          ],
+          "partialFingerprints": { "commitSha": "", "email": "", "author": "", "date": "", "commitMessage": "" }
+        }
+      ]
+    }
+  ]
+}

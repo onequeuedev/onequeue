@@ -1,0 +1,22 @@
+TODO(legal review): placeholder license text. Do not publish a release until
+Keytrion Labs legal has reviewed and replaced or approved this file.
+
+OneQueue Scan (keytrionlabs/onequeue-action)
+OneQueue by Keytrion Labs
+
+Copyright (c) 2026 Keytrion Labs. All rights reserved.
+
+Permission to use this action in GitHub workflows is granted to holders of a
+valid OneQueue account.
+
+No other rights are granted. The source code of this action is published for
+transparency and review; publication does not make it open source.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+Third-party components redistributed in the container image are licensed
+under their own terms. See THIRD_PARTY_NOTICES.md.

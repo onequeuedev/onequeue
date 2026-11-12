@@ -1,0 +1,66 @@
+name: OneQueue Scan
+description: OneQueue by Keytrion Labs. Runs Trivy, Semgrep and Gitleaks in your pipeline and uploads only redacted findings.
+author: Keytrion Labs
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  api-key:
+    description: >-
+      OneQueue API key, sent as a Bearer token. Store it as the secret ONEQUEUE_API_KEY.
+      If empty (for example on pull requests from forks), nothing is uploaded and the step does not fail,
+      except for the local Gitleaks rule in gate mode.
+    required: true
+  api-url:
+    description: OneQueue API base URL. Must be https:// (http:// is allowed only for localhost).
+    required: false
+    default: https://api.keytrionlabs.com
+  scanners:
+    description: Comma-separated scanners to run. Any of trivy, semgrep, gitleaks.
+    required: false
+    default: trivy,semgrep,gitleaks
+  mode:
+    description: >-
+      "upload" uploads findings and never fails the build.
+      "gate" also waits for the OneQueue verdict and fails the build if it says fail.
+    required: false
+    default: upload
+  fail-on:
+    description: Gate mode only. Lowest severity that fails the gate on the server. One of critical, high, none.
+    required: false
+    default: critical
+  gate-timeout:
+    description: Gate mode only. Seconds to wait for the verdict (1-3600).
+    required: false
+    default: "30"
+  on-timeout:
+    description: Gate mode only. What to do when no verdict arrives in time or the upload fails. "pass" (warn) or "fail".
+    required: false
+    default: pass
+  semgrep-config:
+    description: >-
+      Comma-separated Semgrep configs: registry rulesets (p/...) or paths in your repository.
+      Rules are downloaded at runtime; no code is sent to Semgrep (metrics are off).
+    required: false
+    default: p/default
+  gitleaks-history:
+    description: >-
+      Scan git history instead of only the current files. Requires actions/checkout with fetch-depth 0.
+      Author, email, date and commit message are always removed before upload.
+    required: false
+    default: "false"
+
+outputs:
+  upload-id:
+    description: ID of the OneQueue upload, empty if nothing was uploaded.
+  findings:
+    description: Number of redacted findings.
+  verdict:
+    description: Gate result. pass, fail, warn or n/a.
+
+runs:
+  using: docker
+  # Pinned by digest. Updated by the release process (see RELEASING.md).
+  # TODO: replace with the digest printed by the first release workflow run.
+  image: docker://ghcr.io/keytrionlabs/onequeue-action@sha256:0000000000000000000000000000000000000000000000000000000000000000
