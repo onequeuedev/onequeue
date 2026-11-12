@@ -62,5 +62,5 @@ outputs:
 runs:
   using: docker
   # Pinned by digest. Updated by the release process (see RELEASING.md).
-  # TODO: replace with the digest printed by the first release workflow run.
-  image: docker://docker.io/rhysha/onequeuedev@sha256:0000000000000000000000000000000000000000000000000000000000000000
+  # 1.0.0
+  image: docker://docker.io/rhysha/onequeuedev@sha256:52e0d5837ef4b58a3515c9c3e1b6072fd93c6c30c367b7cc56fc7c5212f3cb25
