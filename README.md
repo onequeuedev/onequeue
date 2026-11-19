@@ -120,8 +120,13 @@ requests is in [`examples/onequeue.yml`](examples/onequeue.yml).
    - no verdict in time, upload failed, or verdict unavailable: `on-timeout`
      decides.
 
-   **Local hard rule:** in gate mode, any Gitleaks finding fails the build.
-   This does not depend on the server, `fail-on`, or `api-key`.
+   **Secrets in gate mode** are decided by the server verdict whenever an
+   `api-key` is present: the OneQueue baseline, your triage decisions and the
+   build rules apply, and a new secret still fails the build. Gitleaks no
+   longer fails the build on its own in that case; if no verdict arrives,
+   `on-timeout` decides and the log says how many secrets could not be
+   checked. Without an `api-key` a local rule applies, see
+   [Forked pull requests](#forked-pull-requests).
 6. A short summary is written to the job summary: scanners run, findings
    uploaded, upload ID and gate result.
 
@@ -133,8 +138,32 @@ empty. The action then:
 - prints a warning and **uploads nothing**,
 - still runs **Gitleaks locally** (the other scanners are skipped),
 - in `upload` mode, warns about Gitleaks findings and exits 0,
-- in `gate` mode, fails the build if Gitleaks finds a secret, and otherwise
-  exits 0.
+- in `gate` mode, fails the build only for secrets **in lines the pull request
+  added or changed**, and otherwise exits 0. Secrets that were already in the
+  repository are reported as a warning but do not fail the check.
+
+How the changed lines are found: on a pull request the action compares the base
+commit (from the event payload) with the checked-out commit using
+`git diff --unified=0`; the default checkout of a pull request is the merge of
+the PR into its base, so that diff is exactly the PR. If the base commit is not
+in the checkout, the action fetches it (depth 1), which works for public
+repositories. Only the diff's line numbers are used; nothing from it is logged
+or sent. The rule **fails closed**: if the diff cannot be read, or the run is
+not a pull request, every Gitleaks finding in the workspace fails the build.
+With `gitleaks-history: true` a finding counts when its file was changed by the
+pull request (line numbers of older commits do not match the current file).
+
+### Ignoring a known secret: `.gitleaksignore`
+
+A `.gitleaksignore` file at the root of the repository is honored in every case
+(the action passes `--gitleaks-ignore-path` to Gitleaks). Each line is the
+fingerprint Gitleaks prints for a finding, `path:rule-id:line` (for example
+`config/settings.py:github-pat:3`), or `commit:path:rule-id:line` with
+`gitleaks-history: true`; `#` starts a comment. Ignored findings are not
+counted, not uploaded and not part of the gate. The log says
+`Honoring .gitleaksignore (N entries)`; the entries themselves are never
+printed. Use it for real false positives and rotate anything that was a real
+secret.
 
 ## Dry run: inspect exactly what would be sent
 

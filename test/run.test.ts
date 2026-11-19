@@ -325,10 +325,11 @@ describe('gate mode', () => {
     expect(await go({ scenario: SCENARIOS.error500, inputs: gate({ 'on-timeout': 'fail' }) })).toBe(1);
   });
 
-  it('Gitleaks finding fails the build even when the server says pass', async () => {
+  it('with an api-key, Gitleaks findings do not fail the build locally: the server verdict decides', async () => {
     const scans = { trivy: fixtureText('trivy', ws()), semgrep: fixtureText('semgrep', ws()), gitleaks: fixtureText('gitleaks', ws()) };
-    expect(await go({ scenario: SCENARIOS.pass, inputs: gate({ 'fail-on': 'none' }), scans })).toBe(1);
-    expect(out()).toMatch(/Gitleaks found 2 secret/);
+    expect(await go({ scenario: SCENARIOS.pass, inputs: gate({ 'fail-on': 'none' }), scans })).toBe(0);
+    expect(out()).toMatch(/Gitleaks found 2 secret\(s\); the server verdict/);
+    expect(out()).not.toMatch(/::error::/);
     assertNoLeak(uploads()[0]!.body);
     assertNoLeak(out());
   });
@@ -427,7 +428,7 @@ describe('dry run', () => {
     const r = await dry({ mode: 'gate', 'on-timeout': 'fail' }, { trivy: fixtureText('trivy', ws()), semgrep: fixtureText('semgrep', ws()), gitleaks: fixtureText('gitleaks', ws()) });
     expect(r.code).toBe(0);
     expect(r.netCalls).toEqual([]);
-    expect(out()).toMatch(/::warning::Gitleaks found 2 secret\(s\)\. A dry run does not fail the build, but gate mode would/);
+    expect(out()).toMatch(/::warning::Gitleaks found 2 secret\(s\)\. A dry run does not fail the build; gate mode decides about secrets as described in the README/);
     expect(out()).not.toContain('::error::');
     expect(JSON.parse(readFileSync(payloadPath(), 'utf8')).mode).toBe('gate');
   });
@@ -454,5 +455,142 @@ describe('dry run', () => {
     lines = [];
     expect((await dry({ 'output-file': '../escape.json' })).code).toBe(0);
     expect(existsSync(join(dir, 'escape.json'))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Secrets in gate mode: three cases
+//   1. api-key present: the server verdict decides (baseline, triage, policy; new secrets still fail).
+//   2. no api-key (fork PR): only secrets on lines the PR changed fail the build.
+//   3. a .gitleaksignore in the repository is honored.
+
+const gate = (extra: Record<string, string> = {}) => ({ mode: 'gate', ...extra });
+const BASE_SHA = 'c'.repeat(40);
+// config/settings.py:3 (the github-pat finding) and .env:1 (the generic-api-key finding) are the two findings in the fixture.
+const diffOf = (...hunks: [string, string][]) => hunks.map(([file, range]) => `diff --git a/${file} b/${file}\n--- a/${file}\n+++ b/${file}\n@@ -0,0 ${range} @@\n`).join('');
+
+async function forkPr(opts: { diff: string | null | 'throw'; event?: 'pull_request' | 'push'; baseSha?: string | null; history?: boolean; calls?: RecordedCall[] }): Promise<number> {
+  const env = baseEnv({ 'api-key': '', mode: 'gate', ...(opts.history ? { 'gitleaks-history': 'true' } : {}) }, { GITHUB_EVENT_NAME: opts.event ?? 'pull_request' });
+  if (opts.baseSha !== null) {
+    const ev = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH!, 'utf8'));
+    ev.pull_request.base.sha = opts.baseSha ?? BASE_SHA;
+    writeFileSync(env.GITHUB_EVENT_PATH!, JSON.stringify(ev));
+  }
+  server = await startMockServer(SCENARIOS.accepted);
+  const code = await run({
+    env,
+    write: (l) => lines.push(l),
+    runCommand: fakeRunner({ gitleaks: fixtureText('gitleaks', ws()) }, opts.calls),
+    gitDiff: async () => {
+      if (opts.diff === 'throw') throw new Error('git exploded');
+      return opts.diff;
+    },
+  });
+  expect(server.requests).toHaveLength(0); // nothing is ever uploaded without a key
+  return code;
+}
+
+describe('secrets: with an api-key the server verdict decides', () => {
+  const scans = () => ({ trivy: 'nosarif', semgrep: 'nosarif', gitleaks: fixtureText('gitleaks', ws()) });
+  it('server pass (baseline / triaged / allowed by policy): the build passes although Gitleaks found secrets', async () => {
+    expect(await go({ scenario: SCENARIOS.pass, inputs: gate(), scans: scans() })).toBe(0);
+    expect(out()).toMatch(/Gitleaks found 2 secret\(s\); the server verdict \(baseline, triage and build rules\) allows them/);
+  });
+  it('server fail (a new secret, or one the policy rejects): the build fails with the server reason', async () => {
+    expect(await go({ scenario: SCENARIOS.fail, inputs: gate(), scans: scans() })).toBe(1);
+    expect(out()).toMatch(/::error::OneQueue gate failed/);
+  });
+  it('no verdict in time: on-timeout decides, and the unchecked secrets are reported', async () => {
+    expect(await go({ scenario: SCENARIOS.timeout, inputs: gate({ 'gate-timeout': '4' }), scans: scans() })).toBe(0);
+    expect(out()).toMatch(/could not be checked against the baseline/);
+    expect(await go({ scenario: SCENARIOS.timeout, inputs: gate({ 'gate-timeout': '4', 'on-timeout': 'fail' }), scans: scans() })).toBe(1);
+  });
+});
+
+describe('secrets: without an api-key only lines changed by the pull request count', () => {
+  it('a secret on a changed line fails the build', async () => {
+    const code = await forkPr({ diff: diffOf(['config/settings.py', '+1,5']) });
+    expect(code).toBe(1);
+    expect(out()).toMatch(/::error::OneQueue gate failed: Gitleaks found 1 secret\(s\) in lines changed by this pull request/);
+    expect(out()).toMatch(/::warning::Gitleaks also found 1 secret\(s\) outside the lines changed/);
+    expect(out()).not.toContain(FAKE_TOKEN);
+  });
+  it('secrets that were already there (not on changed lines) do not fail the build', async () => {
+    const code = await forkPr({ diff: diffOf(['README.md', '+1,3'], ['config/settings.py', '+8,2']) });
+    expect(code).toBe(0);
+    expect(out()).not.toMatch(/::error::/);
+    expect(out()).toMatch(/::warning::Gitleaks also found 2 secret\(s\) outside the lines changed/);
+  });
+  it('a new file with a secret fails the build', async () => {
+    expect(await forkPr({ diff: diffOf(['.env', '+1,1']) })).toBe(1);
+  });
+  it('fails closed when the diff cannot be read: every secret in the workspace counts', async () => {
+    expect(await forkPr({ diff: null })).toBe(1);
+    expect(out()).toMatch(/Could not read the pull request diff/);
+    expect(out()).toMatch(/::error::OneQueue gate failed: Gitleaks found 2 secret\(s\) in the workspace/);
+  });
+  it('fails closed when reading the diff throws', async () => {
+    expect(await forkPr({ diff: 'throw' })).toBe(1);
+  });
+  it('fails closed when the event has no base commit', async () => {
+    expect(await forkPr({ diff: '', baseSha: null })).toBe(1);
+    expect(out()).toMatch(/in the workspace/);
+  });
+  it('outside a pull request there is no diff, so every secret in the workspace counts', async () => {
+    expect(await forkPr({ diff: '', event: 'push' })).toBe(1);
+  });
+  it('history mode counts a finding when its file changed in the PR', async () => {
+    expect(await forkPr({ history: true, diff: diffOf(['config/settings.py', '+90,1']) })).toBe(1);
+    lines = [];
+    expect(await forkPr({ history: true, diff: diffOf(['unrelated.py', '+1,1']) })).toBe(0);
+  });
+  it('a clean scan passes without asking for the diff', async () => {
+    let asked = false;
+    const code = await run({
+      env: baseEnv({ 'api-key': '', mode: 'gate' }),
+      write: (l) => lines.push(l),
+      runCommand: fakeRunner({ gitleaks: cleanGitleaks() }),
+      gitDiff: async () => ((asked = true), ''),
+    });
+    expect(code).toBe(0);
+    expect(asked).toBe(false);
+  });
+  it('upload mode only warns, as before', async () => {
+    server = await startMockServer(SCENARIOS.accepted);
+    const code = await run({ env: baseEnv({ 'api-key': '' }), write: (l) => lines.push(l), runCommand: fakeRunner({ gitleaks: fixtureText('gitleaks', ws()) }) });
+    expect(code).toBe(0);
+  });
+});
+
+describe('secrets: .gitleaksignore', () => {
+  const ignoreArgs = (calls: RecordedCall[]) => {
+    const a = calls.find((c) => c.cmd === 'gitleaks')!.args;
+    return a[a.indexOf('--gitleaks-ignore-path') + 1];
+  };
+  it('tells Gitleaks to read the ignore file from the repository, in dir and git mode', async () => {
+    for (const history of [false, true]) {
+      const calls: RecordedCall[] = [];
+      await go({ inputs: history ? { 'gitleaks-history': 'true' } : {}, calls, scans: { trivy: 'nosarif', semgrep: 'nosarif', gitleaks: cleanGitleaks() } });
+      expect(ignoreArgs(calls)).toBe(ws());
+    }
+  });
+  it('says it is honoring the file, counts its entries, and never prints them', async () => {
+    mkdirSync(ws(), { recursive: true });
+    writeFileSync(join(ws(), '.gitleaksignore'), '# accepted: test fixture\n\nconfig/settings.py:github-pat:3\n.env:generic-api-key:1\n');
+    expect(await go({ scans: { trivy: 'nosarif', semgrep: 'nosarif', gitleaks: cleanGitleaks() } })).toBe(0);
+    expect(out()).toMatch(/Honoring \.gitleaksignore \(2 entries\)/);
+    expect(out()).not.toContain('config/settings.py:github-pat');
+  });
+  it('is silent when there is no ignore file', async () => {
+    mkdirSync(ws(), { recursive: true });
+    await go({ scans: { trivy: 'nosarif', semgrep: 'nosarif', gitleaks: cleanGitleaks() } });
+    expect(out()).not.toMatch(/gitleaksignore/);
+  });
+  it('findings Gitleaks leaves out because of the file are neither uploaded nor counted', async () => {
+    // Gitleaks applies the file itself; what the action sees is the report without those findings.
+    mkdirSync(ws(), { recursive: true });
+    writeFileSync(join(ws(), '.gitleaksignore'), 'config/settings.py:github-pat:3\n.env:generic-api-key:1\n');
+    expect(await go({ scenario: SCENARIOS.pass, inputs: gate(), scans: { trivy: 'nosarif', semgrep: 'nosarif', gitleaks: cleanGitleaks() } })).toBe(0);
+    expect(uploads()[0]!.body).not.toContain('github-pat');
   });
 });

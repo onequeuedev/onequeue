@@ -3,11 +3,12 @@
  * whole flow can be tested against the mock API server.
  */
 import { randomUUID } from 'node:crypto';
-import { lstat, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { OneQueueClient, type FetchFn, type SleepFn } from './lib/client.ts';
-import { decide, type ServerOutcome } from './lib/gate.ts';
+import { gitDiff, inChangedLines, parseChangedLines, readBaseSha, type GitDiffFn, type Located } from './lib/diff.ts';
+import { decide, type SecretRule, type ServerOutcome } from './lib/gate.ts';
 import { createLogger, type Writer } from './lib/log.ts';
 import { buildMetadata, type ScannerReport } from './lib/metadata.ts';
 import { redactSarif } from './lib/redact/allowlist.ts';
@@ -30,6 +31,8 @@ export interface RunDeps {
   /** Verdict poll interval. Default 2000 ms. */
   pollIntervalMs?: number;
   scannerTimeoutMs?: number;
+  /** Produces `git diff` text for the pull request (tests inject it). */
+  gitDiff?: GitDiffFn;
 }
 
 export const SCHEMA_VERSION = 1;
@@ -106,6 +109,10 @@ export async function run(deps: RunDeps): Promise<number> {
     const secrets: string[] = [];
     let findings = 0;
     let gitleaksFindings: number | undefined;
+    // Where Gitleaks found things (repo-relative, redacted); used only for the local rule without an api-key.
+    let gitleaksLocations: Located[] = [];
+
+    if (toRun.includes('gitleaks')) await noteGitleaksIgnore(workspace);
 
     for (const name of toRun) {
       log.group(`OneQueue: ${name}`);
@@ -141,7 +148,13 @@ export async function run(deps: RunDeps): Promise<number> {
       out.sarif = undefined;
       runs.push(...red.runs);
       findings += red.findings;
-      if (name === 'gitleaks') gitleaksFindings = red.findings;
+      if (name === 'gitleaks') {
+        gitleaksFindings = red.findings;
+        gitleaksLocations = red.runs.flatMap((r) => r.results.map((x): Located => {
+          const p = x.locations?.[0]?.physicalLocation;
+          return { path: p?.artifactLocation.uri, startLine: p?.region?.startLine, endLine: p?.region?.endLine };
+        }));
+      }
       reports[name] = { status: 'ok', findings: red.findings, ...(out.version ? { version: out.version } : {}) };
       log.info(`${name}: ${red.findings} finding(s) in ${(out.durationMs / 1000).toFixed(1)}s${red.dropped ? `, ${red.dropped} dropped by redaction` : ''}`);
       log.endGroup();
@@ -203,7 +216,8 @@ export async function run(deps: RunDeps): Promise<number> {
       }
     }
 
-    const decision = decide({ mode: inputs.mode, onTimeout: inputs.onTimeout, gitleaksFindings, server });
+    const scope = await secretScope(hasKey, inputs.mode, gitleaksFindings, gitleaksLocations, workspace);
+    const decision = decide({ mode: inputs.mode, onTimeout: inputs.onTimeout, gitleaksFindings, secretRule: scope.rule, localFindings: scope.count, server });
     for (const m of decision.messages) {
       if (m.level === 'error') log.error(m.text);
       else if (m.level === 'warning') log.warning(m.text);
@@ -219,6 +233,38 @@ export async function run(deps: RunDeps): Promise<number> {
     }
 
     return decision.exitCode;
+  }
+
+  /** Say that a .gitleaksignore in the repository is honored (Gitleaks reads it; the action never prints its content). */
+  async function noteGitleaksIgnore(workspace: string): Promise<void> {
+    try {
+      const text = await readFile(join(workspace, '.gitleaksignore'), 'utf8');
+      const entries = text.split('\n').filter((l) => l.trim() !== '' && !l.trim().startsWith('#')).length;
+      log.info(`Honoring .gitleaksignore (${entries} entr${entries === 1 ? 'y' : 'ies'}): findings it lists are not reported.`);
+    } catch {
+      /* no ignore file */
+    }
+  }
+
+  /**
+   * Which rule decides about secrets, and how many findings it counts.
+   * With an api-key the server verdict decides. Without one (fork PRs) only secrets on lines the PR changed count;
+   * if the PR's diff cannot be read, or this is not a pull request, every secret in the workspace counts.
+   */
+  async function secretScope(hasKey: boolean, mode: string, total: number | undefined, found: Located[], workspace: string): Promise<{ rule: SecretRule; count: number }> {
+    const all = total ?? 0;
+    if (hasKey) return { rule: 'server', count: 0 };
+    if (mode !== 'gate' || all === 0) return { rule: 'workspace', count: all };
+    const base = readBaseSha(env);
+    if (!base) return { rule: 'workspace', count: all };
+    const text = await (deps.gitDiff ?? gitDiff)(workspace, base, env).catch(() => null);
+    if (text === null) {
+      log.warning('Could not read the pull request diff (the base commit is not available), so every Gitleaks finding in the workspace counts. Use fetch-depth: 0 on checkout to limit the check to changed lines.');
+      return { rule: 'workspace', count: all };
+    }
+    const changed = parseChangedLines(text);
+    const count = found.filter((f) => inChangedLines(f, changed, inputs.gitleaksHistory)).length;
+    return { rule: 'changed-lines', count };
   }
 
   /**
@@ -254,7 +300,7 @@ export async function run(deps: RunDeps): Promise<number> {
       }
     }
     if ((gitleaksFindings ?? 0) > 0) {
-      log.warning(`Gitleaks found ${gitleaksFindings} secret(s). A dry run does not fail the build${inputs.mode === 'gate' ? ', but gate mode would' : ''}.`);
+      log.warning(`Gitleaks found ${gitleaksFindings} secret(s). A dry run does not fail the build${inputs.mode === 'gate' ? '; gate mode decides about secrets as described in the README' : ''}.`);
     }
     try {
       writeSummary(env, { mode: `${inputs.mode} (dry run)`, scanners: reports, findingsUploaded: null, uploadId: null, uploadNote: note, gateResult: 'not gated (dry run)' });

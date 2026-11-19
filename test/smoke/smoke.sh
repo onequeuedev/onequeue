@@ -8,8 +8,9 @@
 # Checks:
 #   1. upload mode: exit 0, findings from all three scanners are uploaded, and
 #      neither the planted secret nor any source line appears in the payload.
-#   2. gate mode with a verdict of pass: exit 1 because of the local Gitleaks rule.
-#   3. gate mode with an empty api-key: no request is made, exit 1 (Gitleaks rule).
+#   2. gate mode with a verdict of pass: exit 0 (with an api-key the server verdict decides about secrets).
+#   3. gate mode with an empty api-key, not a pull request: no request is made, exit 1 (local rule, whole workspace).
+#   4. a .gitleaksignore listing the planted secret's fingerprint: Gitleaks does not report it.
 set -euo pipefail
 
 IMAGE="${IMAGE:-onequeue-action:local}"
@@ -91,11 +92,11 @@ grep -q 'github-pat' "$WORK/requests.jsonl" || fail "expected a Gitleaks finding
 cp "$WORK/requests.jsonl" "$WORK/upload-payload.jsonl"
 cat "$WORK/summary.md"
 
-echo "== 2. gate mode, server verdict pass, local Gitleaks rule must fail"
+echo "== 2. gate mode, server verdict pass: the server decides about secrets, so exit 0"
 start_mock pass
 run_action gate smoke-api-key-0123456789
-[ "$CODE" = 1 ] || fail "gate mode exited $CODE, expected 1"
-grep -q 'Gitleaks found' "$WORK/log.txt" || fail "missing Gitleaks gate message"
+[ "$CODE" = 0 ] || fail "gate mode exited $CODE, expected 0"
+grep -q 'Gitleaks found' "$WORK/log.txt" || fail "missing Gitleaks notice"
 check_no_leak
 
 echo "== 3. gate mode, empty api-key (fork PR)"
@@ -105,6 +106,16 @@ run_action gate ""
 [ -s "$WORK/requests.jsonl" ] && fail "requests were made without an api key"
 grep -q 'api-key is empty' "$WORK/log.txt" || fail "missing empty-key warning"
 check_no_leak
+
+echo "== 4. .gitleaksignore is honored"
+printf '# accepted for the smoke test\napp/settings.py:github-pat:1\n' > "$WORK/ws/.gitleaksignore"
+start_mock accepted
+run_action upload smoke-api-key-0123456789
+[ "$CODE" = 0 ] || fail "upload mode exited $CODE"
+grep -q 'Honoring .gitleaksignore' "$WORK/log.txt" || fail "missing .gitleaksignore message"
+grep -q 'github-pat' "$WORK/requests.jsonl" && fail "the ignored secret was still reported"
+check_no_leak
+rm -f "$WORK/ws/.gitleaksignore"
 
 echo "SMOKE OK"
 if [ -n "${SMOKE_PAYLOAD_OUT:-}" ]; then cp "$WORK/upload-payload.jsonl" "$SMOKE_PAYLOAD_OUT"; fi

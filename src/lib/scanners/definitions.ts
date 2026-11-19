@@ -58,6 +58,9 @@ export const gitleaks: ScannerDefinition = {
     args: [
       ctx.gitleaksHistory ? 'git' : 'dir',
       ctx.workspace,
+      // Honor the repository's .gitleaksignore (fingerprints of findings the team accepted), wherever the action runs from.
+      '--gitleaks-ignore-path',
+      ctx.workspace,
       '--report-format',
       'sarif',
       '--report-path',

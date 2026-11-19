@@ -6,12 +6,18 @@
 #      onequeuedev/onequeue release you want to use.
 #
 # Pushes to main upload findings (never fails the build).
-# Pull requests are gated: the check fails on findings at or above `fail-on`,
-# and on any secret found by Gitleaks.
+# Pull requests are gated by the OneQueue server verdict: the check fails on
+# findings at or above `fail-on` and on new secrets. Secrets are decided by the
+# server too (baseline, triage and build rules apply), so an old secret that
+# you accepted does not block every pull request.
 #
 # Do not switch this to `pull_request_target`: it would run untrusted fork
 # code with access to your secrets. With `pull_request`, fork PRs get an empty
-# api-key; the action then skips the upload and runs Gitleaks locally only.
+# api-key; the action then skips the upload and runs Gitleaks locally only,
+# and fails the check only for secrets in lines the pull request changed.
+#
+# To ignore a known false positive, list its Gitleaks fingerprint
+# (path:rule-id:line) in a .gitleaksignore file at the root of the repository.
 
 name: OneQueue Scan
 
@@ -35,7 +41,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # fetch-depth: 0       # only needed with gitleaks-history: true
+          # fetch-depth: 0       # needed with gitleaks-history: true; for fork PRs it also
+          #                      guarantees the base commit is there for the changed-lines check
 
       - name: OneQueue Scan
         id: onequeue
