@@ -8,26 +8,52 @@ const SCRIPT = resolve(__dirname, '../scripts/release-tag.sh');
 const DIGEST = 'sha256:' + 'a'.repeat(64);
 let repo: string;
 let remote: string;
+let env: NodeJS.ProcessEnv;
 
-const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
+// Nothing here may depend on the machine's git setup: CI runners have no user identity, and a developer's global config may sign
+// commits. HOME points at an empty directory, the global and system config are ignored, and the identity is given explicitly.
+const isolatedEnv = (home: string): NodeJS.ProcessEnv => ({
+  ...process.env,
+  HOME: home,
+  XDG_CONFIG_HOME: join(home, '.config'),
+  GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_CONFIG_SYSTEM: '/dev/null',
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_AUTHOR_NAME: 'Release Test',
+  GIT_AUTHOR_EMAIL: 'release-test@example.invalid',
+  GIT_COMMITTER_NAME: 'Release Test',
+  GIT_COMMITTER_EMAIL: 'release-test@example.invalid',
+  GIT_TERMINAL_PROMPT: '0',
+});
+
+const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', env }).trim();
 const commit = (msg: string, image = `docker://onequeuedev/onequeue@${DIGEST}`) => {
   writeFileSync(join(repo, 'action.yml'), `name: x\nruns:\n  using: docker\n  image: ${image}\n  # ${msg}\n`);
   git('add', '-A');
-  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', msg);
+  git('commit', '-q', '-m', msg);
   return git('rev-parse', 'HEAD');
 };
-const release = (args: string[], answers: string, env: Record<string, string> = {}) =>
-  spawnSync('bash', [SCRIPT, ...args], { cwd: repo, input: answers, encoding: 'utf8', env: { ...process.env, ...env } });
+const release = (args: string[], answers: string, extra: Record<string, string> = {}) =>
+  spawnSync('bash', [SCRIPT, ...args], { cwd: repo, input: answers, encoding: 'utf8', env: { ...env, ...extra } });
 const tagTarget = (t: string) => git('rev-parse', `${t}^{commit}`);
-const remoteTags = () => execFileSync('git', ['-C', remote, 'tag', '--list'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).sort();
+const remoteTags = () => execFileSync('git', ['-C', remote, 'tag', '--list'], { encoding: 'utf8', env }).trim().split('\n').filter(Boolean).sort();
 
 beforeEach(() => {
   const dir = mkdtempSync(join(tmpdir(), 'oq-tag-'));
+  const home = join(dir, 'home');
+  mkdirSync(home);
+  env = isolatedEnv(home);
   repo = join(dir, 'repo');
   remote = join(dir, 'remote.git');
   mkdirSync(repo);
-  execFileSync('git', ['init', '-q', '--bare', remote]);
-  execFileSync('git', ['init', '-q', '-b', 'main', repo]);
+  execFileSync('git', ['init', '-q', '--bare', '--initial-branch=main', remote], { env });
+  execFileSync('git', ['init', '-q', '--initial-branch=main', repo], { env });
+  // also in the repository itself, so the script (which runs git in it) never needs the identity from the environment
+  git('config', 'user.name', 'Release Test');
+  git('config', 'user.email', 'release-test@example.invalid');
+  git('config', 'commit.gpgsign', 'false');
+  git('config', 'tag.gpgsign', 'false');
+  git('config', 'tag.forceSignAnnotated', 'false');
   git('remote', 'add', 'origin', remote);
 });
 
@@ -72,7 +98,7 @@ describe('scripts/release-tag.sh', () => {
     const second = commit('release 1.2.0');
     const r = release(['1.2.0'], '1.2.0\ny\n');
     expect(r.status, r.stderr).toBe(0);
-    const onRemote = execFileSync('git', ['-C', remote, 'rev-parse', 'v1^{commit}'], { encoding: 'utf8' }).trim();
+    const onRemote = execFileSync('git', ['-C', remote, 'rev-parse', 'v1^{commit}'], { encoding: 'utf8', env }).trim();
     expect(onRemote).toBe(second);
     expect(remoteTags()).toEqual(['v1', 'v1.1.0', 'v1.2.0']);
   });
