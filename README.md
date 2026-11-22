@@ -209,7 +209,7 @@ API, no `api-key` is needed, and the step never fails the build, in either
 mode.
 
 ```yaml
-      - uses: onequeuedev/onequeue@<full-commit-sha> # v1.0.1
+      - uses: onequeuedev/onequeue@v1
         with:
           api-key: ${{ secrets.ONEQUEUE_API_KEY }}   # optional in a dry run
           dry-run: true
