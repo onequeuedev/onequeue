@@ -6,17 +6,18 @@ import { randomUUID } from 'node:crypto';
 import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { OneQueueClient, type FetchFn, type SleepFn } from './lib/client.ts';
+import { findBaseImages } from './lib/baseimages.ts';
+import { ApiError, OneQueueClient, type FetchFn, type SleepFn } from './lib/client.ts';
 import { gitDiff, inChangedLines, parseChangedLines, readBaseSha, type GitDiffFn, type Located } from './lib/diff.ts';
 import { decide, type SecretRule, type ServerOutcome } from './lib/gate.ts';
 import { createLogger, type Writer } from './lib/log.ts';
-import { buildMetadata, type ScannerReport } from './lib/metadata.ts';
+import { buildMetadata, type CoverageGap, type ScannerReport } from './lib/metadata.ts';
 import { redactSarif } from './lib/redact/allowlist.ts';
 import { collectGitleaksSecrets, containsSecret } from './lib/redact/tripwire.ts';
 import type { RedactedRun, ScannerName } from './lib/redact/types.ts';
 import { runScanner, spawnCommand } from './lib/scanners/run.ts';
 import type { RunCommand } from './lib/scanners/types.ts';
-import { parseInputs } from './inputs.ts';
+import { parseInputs, SCANNER_NAMES_ALL } from './inputs.ts';
 import { setOutputs, writeSummary } from './summary.ts';
 
 export interface RunDeps {
@@ -33,6 +34,8 @@ export interface RunDeps {
   scannerTimeoutMs?: number;
   /** Produces `git diff` text for the pull request (tests inject it). */
   gitDiff?: GitDiffFn;
+  /** Base images named in the repository's Dockerfiles (tests inject it; the default reads the workspace). */
+  findBaseImages?: (workspace: string) => Promise<string[]>;
 }
 
 export const SCHEMA_VERSION = 1;
@@ -104,6 +107,10 @@ export async function run(deps: RunDeps): Promise<number> {
 
     const reports: Partial<Record<ScannerName, ScannerReport>> = {};
     for (const s of inputs.scanners) if (!toRun.includes(s)) reports[s] = { status: 'skipped', findings: 0 };
+    // What this run did not cover, in names and short reasons only (sent with the upload; see README).
+    const coverage: CoverageGap[] = [];
+    for (const s of SCANNER_NAMES_ALL) if (!inputs.scanners.includes(s)) coverage.push({ type: 'scanner_skipped', detail: s, reason: 'not enabled in the scanners input' });
+    for (const s of inputs.scanners) if (!toRun.includes(s)) coverage.push({ type: 'scanner_skipped', detail: s, reason: 'no api-key (for example a pull request from a fork)' });
 
     const runs: RedactedRun[] = [];
     const secrets: string[] = [];
@@ -134,6 +141,7 @@ export async function run(deps: RunDeps): Promise<number> {
           log.untrusted(out.stderrTail);
         }
         reports[name] = { status: 'failed', findings: 0, ...(out.version ? { version: out.version } : {}) };
+        coverage.push({ type: 'scanner_failed', detail: name, reason: out.error });
         continue;
       }
 
@@ -169,11 +177,15 @@ export async function run(deps: RunDeps): Promise<number> {
       server = { kind: 'skipped', reason: 'api-key is empty' };
       uploadNote = 'skipped: no api-key';
     } else {
+      // Trivy checks a Dockerfile's settings, not the packages inside the image it starts FROM, and the action never pulls images.
+      for (const image of await (deps.findBaseImages ?? findBaseImages)(workspace).catch(() => [] as string[])) {
+        coverage.push({ type: 'base_image_not_scanned', detail: image });
+      }
       const envelope = {
         schemaVersion: SCHEMA_VERSION,
         mode: inputs.mode,
         failOn: inputs.failOn,
-        metadata: buildMetadata(env, actionVersion, reports),
+        metadata: buildMetadata(env, actionVersion, reports, coverage),
         sarif: { version: '2.1.0', runs },
       };
 
@@ -185,7 +197,7 @@ export async function run(deps: RunDeps): Promise<number> {
         // Should be impossible; refuse rather than leak.
         server = { kind: 'upload-failed', message: 'payload failed the secret tripwire check, upload aborted' };
         uploadNote = 'aborted by secret tripwire';
-        log.warning('OneQueue upload aborted: the redacted payload still contained a secret value. Please report this privately via the Security tab of github.com/onequeuedev/onequeue (Report a vulnerability).');
+        log.warning('OneQueue upload aborted: the redacted payload still contained a secret value. Please report this privately to security@onequeue.dev.');
       } else {
         const client = new OneQueueClient({
           apiUrl: inputs.apiUrl,
@@ -209,14 +221,24 @@ export async function run(deps: RunDeps): Promise<number> {
             server = await client.pollVerdict(res.id, inputs.gateTimeoutSec * 1000, deps.pollIntervalMs ?? 2000);
           }
         } catch (e) {
-          server = { kind: 'upload-failed', message: (e as Error).message };
-          uploadNote = 'upload failed';
-          log.warning(`OneQueue upload failed: ${(e as Error).message}`);
+          if (e instanceof ApiError && e.status === 402) {
+            // The company's plan is not accepting uploads (trial over, or paused). A warning, never a failed build.
+            server = { kind: 'skipped', reason: `OneQueue is not accepting uploads for this company right now (${e.message}). Nothing was uploaded and this does not fail the build.` };
+            uploadNote = 'skipped: uploads paused (HTTP 402)';
+            log.warning(`OneQueue upload skipped: ${e.message}. Ask an owner to check the plan in the dashboard. The build is not failed because of this.`);
+          } else {
+            server = { kind: 'upload-failed', message: (e as Error).message };
+            uploadNote = 'upload failed';
+            log.warning(`OneQueue upload failed: ${(e as Error).message}`);
+          }
         }
       }
     }
 
-    const scope = await secretScope(hasKey, inputs.mode, gitleaksFindings, gitleaksLocations, workspace);
+    // With an api-key the server verdict decides about secrets. When there is no verdict (upload failed, paused, timed out) the
+    // secrets would otherwise be waved through, so the local rule applies instead: secrets on lines this pull request changed fail.
+    const noVerdict = hasKey && server.kind !== 'verdict';
+    const scope = await secretScope(hasKey && !noVerdict, inputs.mode, gitleaksFindings, gitleaksLocations, workspace, noVerdict);
     const decision = decide({ mode: inputs.mode, onTimeout: inputs.onTimeout, gitleaksFindings, secretRule: scope.rule, localFindings: scope.count, server });
     for (const m of decision.messages) {
       if (m.level === 'error') log.error(m.text);
@@ -251,14 +273,16 @@ export async function run(deps: RunDeps): Promise<number> {
    * With an api-key the server verdict decides. Without one (fork PRs) only secrets on lines the PR changed count;
    * if the PR's diff cannot be read, or this is not a pull request, every secret in the workspace counts.
    */
-  async function secretScope(hasKey: boolean, mode: string, total: number | undefined, found: Located[], workspace: string): Promise<{ rule: SecretRule; count: number }> {
+  async function secretScope(serverDecides: boolean, mode: string, total: number | undefined, found: Located[], workspace: string, fallback = false): Promise<{ rule: SecretRule; count: number }> {
     const all = total ?? 0;
-    if (hasKey) return { rule: 'server', count: 0 };
-    if (mode !== 'gate' || all === 0) return { rule: 'workspace', count: all };
+    if (serverDecides) return { rule: 'server', count: 0 };
+    if (mode !== 'gate' || all === 0) return fallback ? { rule: 'server', count: 0 } : { rule: 'workspace', count: all };
+    // Fallback (a key, but no verdict): only secrets the pull request itself added can fail; when that cannot be told, warn only.
     const base = readBaseSha(env);
-    if (!base) return { rule: 'workspace', count: all };
+    if (!base) return fallback ? { rule: 'server', count: 0 } : { rule: 'workspace', count: all };
     const text = await (deps.gitDiff ?? gitDiff)(workspace, base, env).catch(() => null);
     if (text === null) {
+      if (fallback) return { rule: 'server', count: 0 };
       log.warning('Could not read the pull request diff (the base commit is not available), so every Gitleaks finding in the workspace counts. Use fetch-depth: 0 on checkout to limit the check to changed lines.');
       return { rule: 'workspace', count: all };
     }
@@ -286,7 +310,7 @@ export async function run(deps: RunDeps): Promise<number> {
       note = 'dry run: payload failed the secret tripwire check, not written';
       log.warning(
         'OneQueue dry run: the redacted payload still contained a secret value, so it was not written. ' +
-          'Please report this privately via the Security tab of github.com/onequeuedev/onequeue (Report a vulnerability).',
+          'Please report this privately to security@onequeue.dev.',
       );
     } else {
       try {

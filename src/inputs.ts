@@ -35,7 +35,10 @@ export interface ParsedInputs {
  * action.yml leaves api-url empty so this constant applies. Moving to a custom
  * domain later is a one-line change here.
  */
-export const DEFAULT_API_URL = 'https://n3m2eiznc2.execute-api.us-east-1.amazonaws.com';
+export const DEFAULT_API_URL = 'https://api.onequeue.dev';
+
+/** Every scanner the image contains. */
+export const SCANNER_NAMES_ALL: readonly ScannerName[] = ['trivy', 'semgrep', 'gitleaks'];
 
 export const DEFAULT_OUTPUT_FILE = 'onequeue-payload.json';
 

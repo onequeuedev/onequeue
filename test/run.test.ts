@@ -30,7 +30,7 @@ const cleanGitleaks = () => JSON.stringify({ version: '2.1.0', runs: [{ tool: { 
 
 function baseEnv(inputs: Record<string, string>, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   const event = join(dir, 'event.json');
-  writeFileSync(event, JSON.stringify({ pull_request: { number: 42, head: { sha: 'b'.repeat(40), ref: 'feat' }, base: { ref: 'main' } } }));
+  writeFileSync(event, JSON.stringify({ repository: { default_branch: 'main' }, pull_request: { number: 42, head: { sha: 'b'.repeat(40), ref: 'feat' }, base: { ref: 'main' } } }));
   writeFileSync(join(dir, 'summary.md'), '');
   writeFileSync(join(dir, 'output.txt'), '');
   const env: NodeJS.ProcessEnv = {
@@ -99,6 +99,7 @@ describe('upload mode', () => {
       sha: SHA,
       ref: 'refs/pull/42/merge',
       eventName: 'pull_request',
+      defaultBranch: 'main',
       pullRequest: { number: 42, headSha: 'b'.repeat(40), headRef: 'feat', baseRef: 'main' },
       runId: '987',
       runAttempt: '1',
@@ -109,6 +110,7 @@ describe('upload mode', () => {
         semgrep: { status: 'ok', findings: 1, version: '1.182.1' },
         gitleaks: { status: 'ok', findings: 0 },
       },
+      coverage: [],
     });
     expect(body.sarif.version).toBe('2.1.0');
     expect(body.sarif.runs).toHaveLength(3);

@@ -4,8 +4,8 @@ OneQueue Scan is the GitHub Action for OneQueue.
 
 ## Reporting a vulnerability
 
-Report vulnerabilities privately through GitHub: open this repository's
-**Security** tab and click **Report a vulnerability**
+Email **security@onequeue.dev**. You can also report privately through GitHub:
+open this repository's **Security** tab and click **Report a vulnerability**
 (<https://github.com/onequeuedev/onequeue/security/advisories/new>).
 Please do not open a public GitHub issue for security problems.
 
@@ -25,7 +25,7 @@ the issue before disclosing it publicly.
   snippets, secret values, environment variables, commit author data).
 - Leaks of the OneQueue API key (logs, redirects, outputs).
 - Supply-chain issues in this repository, its workflows or the published
-  image `docker.io/rhysha/onequeuedev`.
+  image `docker.io/onequeuedev/onequeue`.
 
 Vulnerabilities in Trivy, Semgrep or Gitleaks themselves should be reported
 to those projects. If one affects this action, please tell us as well.

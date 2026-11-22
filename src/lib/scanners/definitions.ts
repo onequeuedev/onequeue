@@ -57,7 +57,9 @@ export const gitleaks: ScannerDefinition = {
     cmd: 'gitleaks',
     args: [
       ctx.gitleaksHistory ? 'git' : 'dir',
-      ctx.workspace,
+      // Relative to the workspace (the command runs there): Gitleaks builds its fingerprints, "path:rule-id:line", from this path,
+      // so the entries a team puts in .gitleaksignore only match when the path is repository-relative, not the runner's absolute one.
+      '.',
       // Honor the repository's .gitleaksignore (fingerprints of findings the team accepted), wherever the action runs from.
       '--gitleaks-ignore-path',
       ctx.workspace,

@@ -84,6 +84,9 @@ export function decide(input: GateInput): GateDecision {
 
   switch (s.kind) {
     case 'skipped':
+      if (input.secretRule === 'server' && leaks > 0) {
+        messages.push({ level: 'warning', text: `Gitleaks found ${leaks} secret(s), but without a server verdict they could not be checked against the baseline, triage and build rules.` });
+      }
       warn = true;
       messages.push({ level: 'warning', text: `Server verdict skipped: ${s.reason}` });
       break;

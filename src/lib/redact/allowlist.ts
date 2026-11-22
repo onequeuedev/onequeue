@@ -51,7 +51,8 @@ export interface RedactOptions {
 
 function safeRuleId(v: unknown): string | undefined {
   const s = str(v);
-  return s && RULE_ID.test(s) ? s : undefined;
+  // Every kept string passes the scrubber: an id that would be changed by it is not an id, so the result is dropped.
+  return s && RULE_ID.test(s) && scrubText(s, { maxLen: 256, entropy: false }) === s ? s : undefined;
 }
 
 function safeHttpsUrl(v: unknown): string | undefined {
@@ -60,7 +61,10 @@ function safeHttpsUrl(v: unknown): string | undefined {
   try {
     const u = new URL(s);
     if (u.protocol !== 'https:' || u.username || u.password) return undefined;
-    return u.toString();
+    // A link to documentation: no query string or fragment (they could carry anything).
+    u.search = '';
+    u.hash = '';
+    return scrubText(u.toString(), { maxLen: 2048, entropy: false });
   } catch {
     return undefined;
   }

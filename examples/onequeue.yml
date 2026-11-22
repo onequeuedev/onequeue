@@ -3,9 +3,11 @@
 # Copy this file to .github/workflows/onequeue.yml in YOUR repository, then:
 #   1. Add the secret ONEQUEUE_API_KEY (Settings -> Secrets and variables -> Actions).
 #   2. Replace <full-commit-sha> with the 40-character commit SHA of the
-#      onequeuedev/onequeue release you want to use.
+#      onequeuedev/onequeue release you want to use (v1.1.0 or later).
 #
-# Pushes to main upload findings (never fails the build).
+# Pushes to the default branch and a daily scheduled run upload findings (never
+# fails the build). The daily run catches vulnerabilities that are published
+# against packages you already use, when nothing in your code changed.
 # Pull requests are gated by the OneQueue server verdict: the check fails on
 # findings at or above `fail-on` and on new secrets. Secrets are decided by the
 # server too (baseline, triage and build rules apply), so an old secret that
@@ -23,8 +25,10 @@ name: OneQueue Scan
 
 on:
   push:
-    branches: [main]
+    branches: [main] # your default branch
   pull_request:
+  schedule:
+    - cron: '0 3 * * *' # every day at 03:00 UTC
 
 permissions:
   contents: read
@@ -46,9 +50,10 @@ jobs:
 
       - name: OneQueue Scan
         id: onequeue
-        uses: onequeuedev/onequeue@<full-commit-sha> # v1.0.0
+        uses: onequeuedev/onequeue@<full-commit-sha> # v1.1.0
         with:
           api-key: ${{ secrets.ONEQUEUE_API_KEY }}
+          api-url: https://api.onequeue.dev # the default; shown so it is easy to see where findings go
           mode: ${{ github.event_name == 'pull_request' && 'gate' || 'upload' }}
           fail-on: high # critical | high | none
           gate-timeout: 60 # seconds to wait for the server verdict

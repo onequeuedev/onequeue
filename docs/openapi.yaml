@@ -69,6 +69,14 @@ paths:
                 $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Error'
+        '402':
+          description: >-
+            The company's plan is not accepting uploads (trial over, or paused). The Action treats this as a
+            warning: nothing is uploaded and the build is not failed for it.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '403':
           $ref: '#/components/responses/Error'
         '409':
@@ -241,12 +249,16 @@ components:
     Metadata:
       type: object
       additionalProperties: false
-      required: [repository, sha, ref, eventName, pullRequest, runId, runAttempt, runUrl, actionVersion, scanners]
+      required: [repository, sha, ref, eventName, pullRequest, runId, runAttempt, runUrl, actionVersion, scanners, coverage]
       properties:
         repository: { type: string, examples: [acme/app] }
         sha: { type: string, description: 'GITHUB_SHA (40 or 64 hex chars), empty if unavailable.' }
         ref: { type: string, examples: [refs/pull/42/merge] }
-        eventName: { type: string, examples: [pull_request] }
+        eventName: { type: string, examples: [pull_request, push, schedule] }
+        defaultBranch:
+          type: string
+          description: The repository's default branch, from the GitHub event payload. Absent when the event does not carry it.
+          examples: [main]
         pullRequest:
           oneOf:
             - type: 'null'
@@ -269,6 +281,18 @@ components:
             trivy: { $ref: '#/components/schemas/ScannerReport' }
             semgrep: { $ref: '#/components/schemas/ScannerReport' }
             gitleaks: { $ref: '#/components/schemas/ScannerReport' }
+        coverage:
+          type: array
+          maxItems: 40
+          description: What this run did not cover. Names and short reasons only.
+          items:
+            type: object
+            additionalProperties: false
+            required: [type, detail]
+            properties:
+              type: { type: string, enum: [scanner_failed, scanner_skipped, base_image_not_scanned] }
+              detail: { type: string, description: 'The scanner name, or the base image reference (for example node:24-slim).' }
+              reason: { type: string, description: 'A short plain reason, for example "exited with code 2".' }
 
     ScannerReport:
       type: object

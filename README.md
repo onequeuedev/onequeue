@@ -23,6 +23,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: '0 3 * * *' # daily, so new vulnerabilities in unchanged code show up
 
 permissions:
   contents: read
@@ -35,7 +37,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: onequeuedev/onequeue@<full-commit-sha> # v1.0.0
+      - uses: onequeuedev/onequeue@<full-commit-sha> # v1.1.0
         with:
           api-key: ${{ secrets.ONEQUEUE_API_KEY }}
 ```
@@ -52,7 +54,7 @@ still runs Gitleaks locally (see [Forked pull requests](#forked-pull-requests)).
 ### Gate mode
 
 ```yaml
-      - uses: onequeuedev/onequeue@<full-commit-sha> # v1.0.0
+      - uses: onequeuedev/onequeue@<full-commit-sha> # v1.1.0
         with:
           api-key: ${{ secrets.ONEQUEUE_API_KEY }}
           mode: gate
@@ -61,8 +63,13 @@ still runs Gitleaks locally (see [Forked pull requests](#forked-pull-requests)).
           on-timeout: pass     # pass (warn only, default) or fail
 ```
 
-A complete, commented workflow that uploads on pushes to `main` and gates pull
-requests is in [`examples/onequeue.yml`](examples/onequeue.yml).
+A complete, commented workflow that uploads on pushes to the default branch and
+on a daily schedule, and gates pull requests, is in
+[`examples/onequeue.yml`](examples/onequeue.yml).
+
+`schedule` runs are uploaded like pushes to the default branch (use `mode: upload`
+for them). A daily run matters: a vulnerability can be published against a package
+you already use, and nothing in your code changed to trigger a scan.
 
 ## Requirements
 
@@ -77,7 +84,7 @@ requests is in [`examples/onequeue.yml`](examples/onequeue.yml).
 | Input | Default | Description |
 | --- | --- | --- |
 | `api-key` | (required) | OneQueue API key. Use the secret `ONEQUEUE_API_KEY`. Masked with `::add-mask::` and never logged. |
-| `api-url` | `https://n3m2eiznc2.execute-api.us-east-1.amazonaws.com` | API base URL. Leave unset to use the OneQueue API. Must be `https://`; `http://` is allowed only for `localhost`. |
+| `api-url` | `https://api.onequeue.dev` | API base URL. Leave unset to use the OneQueue API. Must be `https://`; `http://` is allowed only for `localhost`. |
 | `scanners` | `trivy,semgrep,gitleaks` | Comma-separated list. Only these scanners run. |
 | `mode` | `upload` | `upload` or `gate`. |
 | `fail-on` | `critical` | Gate mode: `critical`, `high` or `none`. Sent to the server, which computes the verdict. |
@@ -118,14 +125,19 @@ requests is in [`examples/onequeue.yml`](examples/onequeue.yml).
    - `404` (the verdict does not exist yet, which is normal right after an
      upload): treated as pending, polling continues until `gate-timeout`;
    - no verdict in time, upload failed, or verdict unavailable: `on-timeout`
-     decides.
+     decides. An upload answered with `402` (the company's plan is not accepting
+   uploads) is a **warning**, never a failure: nothing is uploaded and the
+   build passes.
 
    **Secrets in gate mode** are decided by the server verdict whenever an
    `api-key` is present: the OneQueue baseline, your triage decisions and the
    build rules apply, and a new secret still fails the build. Gitleaks no
-   longer fails the build on its own in that case; if no verdict arrives,
-   `on-timeout` decides and the log says how many secrets could not be
-   checked. Without an `api-key` a local rule applies, see
+   longer fails the build on its own in that case. **If no verdict arrives**
+   (upload failed, `402`, timeout), secrets are not waved through: a secret on a
+   line the pull request itself changed fails the build, while older secrets
+   only produce a warning (when the pull request's diff cannot be read, the
+   log says the secrets could not be checked). `on-timeout` still decides
+   about everything else. Without an `api-key` a local rule applies, see
    [Forked pull requests](#forked-pull-requests).
 6. A short summary is written to the job summary: scanners run, findings
    uploaded, upload ID and gate result.
@@ -221,7 +233,8 @@ this list, including fields that future scanner versions add, is dropped.
 | Line range | `startLine`, `endLine` |
 | Message | rebuilt per scanner (see below), scrubbed, max 1000 chars |
 | Fixed version | Trivy's `Fixed Version`, as `result.properties.fixedVersion` |
-| Run metadata | repository, commit SHA, ref, event name, PR number (and head SHA and branch names), run ID, run attempt, run URL, action version, scanner versions, status and finding counts, `mode`, `fail-on` |
+| Run metadata | repository, commit SHA, ref, event name, the repository's default branch, PR number (and head SHA and branch names, scrubbed), run ID, run attempt, run URL, action version, scanner versions, status and finding counts, `mode`, `fail-on` |
+| Coverage gaps | scanners that failed or were not enabled (name and a short reason such as `exited with code 2`), and the base images named in your Dockerfiles' `FROM` lines that were not scanned (the image reference only, for example `node:24-slim`; nothing is pulled, and no file paths are sent) |
 
 ### Removed
 
@@ -252,7 +265,7 @@ this list, including fields that future scanner versions add, is dropped.
 
 ### Extra safeguards
 
-- **Scrubbing.** All text that is kept is scanned for secret patterns (cloud
+- **Scrubbing.** Every string that is kept (rule ids, names and descriptions, link targets without query strings, branch names, coverage notes) is scanned for secret patterns (cloud
   keys, tokens, JWTs, private keys, `password=...`, credentials in URLs, long
   random strings), which are replaced with `[REDACTED]`.
 - **Tripwire.** Before uploading, the action checks the final payload for
@@ -285,16 +298,20 @@ The metadata values are illustrative.
     "sha": "9f2c1e0d4b7a8c6e5f3d2b1a0c9e8d7f6a5b4c3d",
     "ref": "refs/pull/42/merge",
     "eventName": "pull_request",
+    "defaultBranch": "main",
     "pullRequest": { "number": 42, "headSha": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b", "headRef": "feature/login", "baseRef": "main" },
     "runId": "11873465",
     "runAttempt": "1",
     "runUrl": "https://github.com/acme/app/actions/runs/11873465",
-    "actionVersion": "1.0.0",
+    "actionVersion": "1.1.0",
     "scanners": {
       "trivy": { "status": "ok", "findings": 1, "version": "0.76.1" },
       "semgrep": { "status": "ok", "findings": 1, "version": "1.182.1" },
       "gitleaks": { "status": "ok", "findings": 1, "version": "8.30.1" }
-    }
+    },
+    "coverage": [
+      { "type": "base_image_not_scanned", "detail": "node:24-slim" }
+    ]
   },
   "sarif": {
     "version": "2.1.0",
@@ -385,12 +402,25 @@ The full API contract is in [docs/openapi.yaml](docs/openapi.yaml).
 - The image is pinned by digest in [action.yml](action.yml) and built by
   [.github/workflows/release.yml](.github/workflows/release.yml), with SBOM
   and build provenance attestations. You can verify it with
-  `gh attestation verify oci://index.docker.io/rhysha/onequeuedev@<digest> --owner onequeuedev`.
+  `gh attestation verify oci://index.docker.io/onequeuedev/onequeue@<digest> --owner onequeuedev`.
 - Base images are pinned by digest. Trivy and Gitleaks release tarballs are
   checked against pinned SHA256 values. Semgrep is installed from a
   hash-locked requirements file (`pip --require-hashes --only-binary=:all:`).
 - Every action used in this repository's workflows is pinned by commit SHA.
   Dependabot keeps npm packages, actions, base images and Semgrep up to date.
+
+## Releasing
+
+For maintainers. The image lives at `docker.io/onequeuedev/onequeue` (the name is set once, as `IMAGE_NAME` in
+[release.yml](.github/workflows/release.yml)); older releases stay available under their old image and digest.
+
+1. In the repository settings add the secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (once).
+2. Actions, **Release image**, **Run workflow**, version `1.1.0`. It tests, builds for `linux/amd64` and `linux/arm64`, pushes the
+   `1.1.0` and `v1.1.0` tags, attests the build, and prints the digest in the job summary.
+3. `scripts/pin-image.sh sha256:<digest> 1.1.0` points `runs.image` in [action.yml](action.yml) at that digest.
+4. Commit that change, then `git tag v1.1.0` on that commit and push the commit and the tag.
+5. Create the GitHub Release for `v1.1.0` with notes in plain English (every change since the last release). The commit SHA
+   of the tag is what users pin in their workflows.
 
 ## Development
 

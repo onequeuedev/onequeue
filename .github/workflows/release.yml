@@ -1,16 +1,23 @@
 name: Release image
 
-# Builds the container image, pushes it to Docker Hub (docker.io/rhysha/onequeuedev)
-# and prints the digest to pin in action.yml (runs.image).
+# Builds the container image for linux/amd64 and linux/arm64, pushes it to Docker Hub and prints the digest to pin
+# in action.yml (runs.image). Run it by hand: Actions -> Release image -> Run workflow, and give the version.
 #
 # Needs, in the repository settings (Secrets and variables -> Actions):
-#   secret DOCKERHUB_TOKEN  a Docker Hub access token (Read & Write) for the user rhysha
+#   secret DOCKERHUB_USERNAME  the Docker Hub account that owns the image (onequeuedev)
+#   secret DOCKERHUB_TOKEN     a Docker Hub access token for that account (Read & Write)
+#
+# The image name is set once, in IMAGE_NAME below.
+#
+# Order of a release (the full list is in the README, "Releasing"):
+#   1. run this workflow with the version  ->  2. scripts/pin-image.sh <digest> from its summary  ->  3. commit
+#   4. tag vX.Y.Z  ->  5. create the GitHub Release with notes.
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version without the leading v (for example 1.2.0)
+        description: Release version without the leading v (for example 1.1.0)
         required: true
         type: string
 
@@ -29,9 +36,8 @@ jobs:
       id-token: write
       attestations: write
     env:
-      IMAGE: docker.io/rhysha/onequeuedev
-      # Docker Hub images are attested under index.docker.io.
-      ATTEST_SUBJECT: index.docker.io/rhysha/onequeuedev
+      # The one place the image name lives: Docker Hub account/repository.
+      IMAGE_NAME: onequeuedev/onequeue
     steps:
       - name: Validate version
         env:
@@ -39,6 +45,16 @@ jobs:
         run: |
           if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
             echo "::error::version must look like 1.2.3"
+            exit 1
+          fi
+
+      - name: Check the Docker Hub secrets exist
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo "::error::Add the repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (Settings -> Secrets and variables -> Actions)."
             exit 1
           fi
 
@@ -60,7 +76,7 @@ jobs:
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: docker.io
-          username: rhysha # Docker Hub user; not a secret
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push
@@ -75,8 +91,8 @@ jobs:
           build-args: ACTION_VERSION=${{ inputs.version }}
           # Same image under both spellings, to match the git tag vX.Y.Z.
           tags: |
-            ${{ env.IMAGE }}:${{ inputs.version }}
-            ${{ env.IMAGE }}:v${{ inputs.version }}
+            docker.io/${{ env.IMAGE_NAME }}:${{ inputs.version }}
+            docker.io/${{ env.IMAGE_NAME }}:v${{ inputs.version }}
           labels: |
             org.opencontainers.image.version=${{ inputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -84,10 +100,11 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-name: ${{ env.ATTEST_SUBJECT }}
+          # Docker Hub images are attested under index.docker.io.
+          subject-name: index.docker.io/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.build.outputs.digest }}
           # The attestation is stored by GitHub; verify it with
-          # gh attestation verify oci://index.docker.io/rhysha/onequeuedev@<digest> --owner onequeuedev
+          # gh attestation verify oci://index.docker.io/onequeuedev/onequeue@<digest> --owner onequeuedev
           push-to-registry: false
 
       - name: Print digest
@@ -99,11 +116,19 @@ jobs:
           {
             echo "## OneQueue Scan image ${VERSION}"
             echo
+            echo "Image: \`docker.io/${IMAGE_NAME}:${VERSION}\` (linux/amd64, linux/arm64)"
+            echo
             echo "Digest: \`${DIGEST}\`"
             echo
-            echo "Pin it in action.yml:"
+            echo "Next: pin it in action.yml, commit, tag v${VERSION}:"
+            echo
+            echo '```sh'
+            echo "scripts/pin-image.sh ${DIGEST} ${VERSION}"
+            echo '```'
+            echo
+            echo "which sets:"
             echo
             echo '```yaml'
-            echo "  image: docker://${IMAGE}@${DIGEST}"
+            echo "  image: docker://${IMAGE_NAME}@${DIGEST}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
