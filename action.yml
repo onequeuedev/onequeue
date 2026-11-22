@@ -75,6 +75,5 @@ outputs:
 runs:
   using: docker
   # Pinned by digest. Updated on each release with scripts/pin-image.sh, from the release workflow summary.
-  # TODO(release): this still points at the 1.0.1 image under the OLD name (docker.io/rhysha/onequeuedev). After the release workflow has pushed v1.1.0, run scripts/pin-image.sh sha256:<digest> 1.1.0.
-  # 1.0.1
-  image: docker://docker.io/rhysha/onequeuedev@sha256:c0c40c910dcbb35de1835ae9edde364da4fa351830a0a002d81b125300a799a8
+  # 1.1.0
+  image: docker://onequeuedev/onequeue@sha256:42ebed576f0620b2fc2ea7ba9720dbf1ed6ffe61e5c0795c6a6b1c3d036f3711
