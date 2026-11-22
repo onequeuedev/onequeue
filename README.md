@@ -37,24 +37,46 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: onequeuedev/onequeue@<full-commit-sha> # v1.1.0
+      - uses: onequeuedev/onequeue@v1
         with:
           api-key: ${{ secrets.ONEQUEUE_API_KEY }}
 ```
 
-Replace `<full-commit-sha>` with the 40-character commit SHA of the release
-tag you want (shown on the release page). Pinning by SHA means a moved tag
-can't change the code that runs in your pipeline.
+`@v1` follows every 1.x release. To pin an exact release instead, use its
+40-character commit SHA (shown on the release page): `onequeuedev/onequeue@<full-commit-sha> # v1.1.0`.
+A pinned SHA can't change under you; see [Which version to use](#which-version-to-use).
 
 Do not use `pull_request_target` with this action. Plain `pull_request` is
 safe: pull requests from forks get no secrets, so `api-key` is empty. The
 action then prints a warning, uploads nothing, and exits successfully. It
 still runs Gitleaks locally (see [Forked pull requests](#forked-pull-requests)).
 
+### Which version to use
+
+- **`@v1` (recommended): automatic updates within 1.x.** `v1` is a tag that moves to every 1.x release, so you get fixes and new
+  features without touching your workflow. Nothing in 1.x removes or changes an input or a result in a breaking way; those changes
+  go to a new major version (`@v2`), which you choose yourself.
+- **A commit SHA, kept fresh by Dependabot: the strictest.** Pin the 40-character SHA of a release (it is shown on the release
+  page), and let Dependabot open a pull request when a new release is out:
+
+  ```yaml
+  # .github/dependabot.yml
+  version: 2
+  updates:
+    - package-ecosystem: github-actions
+      directory: /
+      schedule:
+        interval: weekly
+  ```
+
+  A pinned SHA can never change under you; the tag `v1` can (that is its point).
+
+The examples below show `@v1`. In the dashboard, the API keys page has both forms ready to copy.
+
 ### Gate mode
 
 ```yaml
-      - uses: onequeuedev/onequeue@<full-commit-sha> # v1.1.0
+      - uses: onequeuedev/onequeue@v1
         with:
           api-key: ${{ secrets.ONEQUEUE_API_KEY }}
           mode: gate
@@ -417,10 +439,12 @@ For maintainers. The image lives at `docker.io/onequeuedev/onequeue` (the name i
 1. In the repository settings add the secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (once).
 2. Actions, **Release image**, **Run workflow**, version `1.1.0`. It tests, builds for `linux/amd64` and `linux/arm64`, pushes the
    `1.1.0` and `v1.1.0` tags, attests the build, and prints the digest in the job summary.
-3. `scripts/pin-image.sh sha256:<digest> 1.1.0` points `runs.image` in [action.yml](action.yml) at that digest.
-4. Commit that change, then `git tag v1.1.0` on that commit and push the commit and the tag.
-5. Create the GitHub Release for `v1.1.0` with notes in plain English (every change since the last release). The commit SHA
-   of the tag is what users pin in their workflows.
+3. `scripts/pin-image.sh sha256:<digest> 1.1.0` points `runs.image` in [action.yml](action.yml) at that digest. Commit and push it.
+4. `scripts/release-tag.sh 1.1.0` tags that commit `v1.1.0` and moves the major tag `v1` to it (it asks you to type the version
+   first, and again before it pushes). Breaking changes are released as `2.0.0` and move `v2`; `v1` stays where it was.
+5. Create the GitHub Release for `v1.1.0` with notes in plain English (every change since the last release). Its commit SHA is
+   what people who pin use.
+6. Update the version in the OneQueue dashboard (`ACTION_RELEASE_VERSION` and `ACTION_RELEASE_SHA` in `src/lib/actionRelease.ts`).
 
 ## Development
 

@@ -2,8 +2,8 @@
 #
 # Copy this file to .github/workflows/onequeue.yml in YOUR repository, then:
 #   1. Add the secret ONEQUEUE_API_KEY (Settings -> Secrets and variables -> Actions).
-#   2. Replace <full-commit-sha> with the 40-character commit SHA of the
-#      onequeuedev/onequeue release you want to use (v1.1.0 or later).
+#   2. `@v1` follows every 1.x release. To pin an exact release instead, replace it with the
+#      40-character commit SHA of that release and add a Dependabot entry for github-actions.
 #
 # Pushes to the default branch and a daily scheduled run upload findings (never
 # fails the build). The daily run catches vulnerabilities that are published
@@ -50,7 +50,7 @@ jobs:
 
       - name: OneQueue Scan
         id: onequeue
-        uses: onequeuedev/onequeue@<full-commit-sha> # v1.1.0
+        uses: onequeuedev/onequeue@v1 # or a full commit SHA, see above
         with:
           api-key: ${{ secrets.ONEQUEUE_API_KEY }}
           api-url: https://api.onequeue.dev # the default; shown so it is easy to see where findings go
